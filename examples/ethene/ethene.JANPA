@@ -20,9 +20,9 @@ Settings used in this run:
 
  -i: C:\Users\mccan\orca_calcs\NBO\ethene.PURE
  -npacharges: (empty)
- -NAO_Molden_File: (empty)
- -LHO_Molden_File: (empty)
- -CLPO_Molden_File: ethene_CLPO.molden
+ -NAO_Molden_File: ethene_NAO_spherical.molden
+ -LHO_Molden_File: ethene_LHO_spherical.molden
+ -CLPO_Molden_File: ethene_CLPO_spherical.molden
  -PrintGeom: false
  -WibergBondOrders_File: (empty)
  -D_Matrix_File: (empty)
@@ -47,15 +47,15 @@ Settings used in this run:
  -PNAO2AO_File: (empty)
  -CLPO2LHO_File: ethene.clpo2lho.txt
  -LHO2NAO_File: ethene.lho2nao.txt
- -LPO2AHO_File: (empty)
- -AHO2NAO_File: (empty)
+ -LPO2AHO_File: ethene.lpo2aho.txt
+ -AHO2NAO_File: ethene.aho2nao.txt
  -doFock: true
  -Fock_AO_File: ethene.fock_ao.txt
  -Fock_NAO_File: ethene.fock_nao.txt
  -printnmbfock: false
- -PNAO_Molden_File: (empty)
- -AHO_Molden_File: (empty)
- -LPO_Molden_File: (empty)
+ -PNAO_Molden_File: ethene_PNAO_spherical.molden
+ -AHO_Molden_File: ethene_AHO_spherical.molden
+ -LPO_Molden_File: ethene_LPO_spherical.molden
  -MatrixMaxValuesPerLine: 0
  -MatrixFloatNumberFormat: %.9f
  -maximumBondIonicity: 9.00E-01
@@ -701,20 +701,39 @@ NAO	          Label	Host	occup.	<NAO|F|NAO>
 84	  A6*: R38*p(0)	6	0.0001806	2.5351531
 85	  A6*: R38*p(1)	6	0.0004449	2.6761054
 86	 A6*: R38*p(-1)	6	0.0000858	2.1457704
+Writing PNAOs to	ethene_PNAO_spherical.molden
+Note: diagonal elements of the Fock matrix in PNAO baiss will be used as PNAO energies
+Writing NAOs to	ethene_NAO_spherical.molden
+Note: diagonal elements of the Fock matrix in NAO baiss will be used as NAO energies
 
 Exporting matrix "CLPOs in LHO basis" to ethene.clpo2lho.txt
 done
 
 Exporting matrix "LHOs in NAO basis" to ethene.lho2nao.txt
 done
-Writing CLPOs to	ethene_CLPO.molden
+
+Exporting matrix "LPOs in AHO basis" to ethene.lpo2aho.txt
+done
+
+Exporting matrix "AHOs in NAO basis" to ethene.aho2nao.txt
+done
+Writing LHOs to	ethene_LHO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing CLPOs to	ethene_CLPO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing AHOs to	ethene_AHO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing LPOs to	ethene_LPO_spherical.molden
 Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
 
 
 
 0 warning(s)
 
-Total run time: 0 min, 0.7 sec
+Total run time: 0 min, 0.8 sec
 
 
                           * * *                                         

@@ -597,6 +597,10 @@ def convert_to_cart(in_path: Path, out_path: Path,
             report += (f", min kept={min(kept):.4f}, "
                        f"max dropped={max(drop):.4f}")
         report += f"; m_electrons={2 * nocc})"
+        true_e = sum(b[2] for b in mo_blocks)
+        if abs(2 * nocc - true_e) > 0.5:
+            report += (f" [note: sum(Occup)={true_e:.3f} but the integer "
+                       f"layout makes Avogadro count {2 * nocc}]")
     if worst_dc > 1e-9 or worst_dn > 1e-9 or n_mo == 0:
         raise RuntimeError(f"VALIDATION FAILED: {report}")
     out_path.write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
@@ -751,6 +755,63 @@ LABEL_OCC_TOL = 2e-5    # occupancy agreement when mapping stdout -> file
 _EXPORT_SUFFIXES = ("clpo", "lho", "nao", "pnao", "aho", "lpo",
                     "cart", "fixed", "spherical")
 _CLASS_RANK = {"BD": 0, "LP": 0, "NB": 1, "RY": 2}
+
+# The JANPA Molden exports this script can carry through the viewer/analysis
+# pipeline.
+class SetExport(NamedTuple):
+    """One JANPA orbital set: tag, janpa option, route-B chain, sortability.
+
+    ``chain`` is the NAO-space transformation chain that route B of --e2
+    uses (an empty tuple means the F_NAO dump itself is the check, i.e.
+    the NAO set; None means no route-B check is possible).  ``sortable``
+    is False for the pre-orthogonalization intermediate PNAO, for which
+    energy ordering and pair analysis are not defined.
+    """
+
+    tag: str
+    opt: str
+    chain: tuple[str, ...] | None
+    sortable: bool
+
+
+_SET_EXPORTS = {
+    "clpo": SetExport("CLPO", "-CLPO_Molden_File",
+                      ("clpo2lho", "lho2nao"), True),
+    "lho":  SetExport("LHO", "-LHO_Molden_File", ("lho2nao",), True),
+    "aho":  SetExport("AHO", "-AHO_Molden_File", ("aho2nao",), True),
+    "lpo":  SetExport("LPO", "-LPO_Molden_File", ("lpo2aho", "aho2nao"), True),
+    "nao":  SetExport("NAO", "-NAO_Molden_File", (), True),
+    "pnao": SetExport("PNAO", "-PNAO_Molden_File", None, False),
+}
+
+
+def _set_from_stem(stem: str) -> SetExport | None:
+    """The SetExport whose tag appears in a filename stem, if any."""
+    low = stem.lower()
+    for se in _SET_EXPORTS.values():
+        if f"_{se.tag.lower()}" in low:
+            return se
+    return None
+
+# janpa dump options: key -> (option, filename pattern).  The S / Fock dumps
+# are shared by every set; the transformation chains feed the route-B
+# cross-check of --e2 (NAO-space chains, each verified against route A).
+_DUMP_EXPORTS = {
+    "s":        ("-S_Matrix_File", "{b}.S.txt"),
+    "fock_ao":  ("-Fock_AO_File", "{b}.fock_ao.txt"),
+    "fock_nao": ("-Fock_NAO_File", "{b}.fock_nao.txt"),
+    "clpo2lho": ("-CLPO2LHO_File", "{b}.clpo2lho.txt"),
+    "lho2nao":  ("-LHO2NAO_File", "{b}.lho2nao.txt"),
+    "aho2nao":  ("-AHO2NAO_File", "{b}.aho2nao.txt"),
+    "lpo2aho":  ("-LPO2AHO_File", "{b}.lpo2aho.txt"),
+}
+
+
+def requested_sets(args) -> list[str]:
+    """The orbital-set keys requested on the command line, in fixed order."""
+    if getattr(args, "all_sets", False):
+        return list(_SET_EXPORTS)
+    return [k for k in _SET_EXPORTS if getattr(args, k)]
 
 
 class SortPlan(NamedTuple):
@@ -1119,7 +1180,9 @@ def plan_orbital_order(molden_path: Path, pure: Path | None = None,
         raise RuntimeError(
             f"cannot order orbitals: no energy inputs ({', '.join(missing)})"
             f" and no usable CLPO labels ({label_why}).\n"
-            f"  produce them with:  python orca_to_janpa.py {base} --clpo"
+            f"  produce them with:  python orca_to_janpa.py {base} --clpo "
+            f"(or the set flag matching this export: --lho/--aho/--lpo/"
+            f"--nao/--pnao)"
         )
 
     n_occ = sum(1 for o in occs if o > 1.0)
@@ -1200,15 +1263,25 @@ def pair_interaction_analysis(
         s_matrix: Path | None = None,
         fock_ao: Path | None = None,
         nao: Path | None = None,
-        clpo2lho: Path | None = None,
-        lho2nao: Path | None = None,
+        set_key: str | None = None,
 ) -> tuple[list[str], list[str], str]:
     """E(2)-like + charge-transfer pair table for a JANPA orbital export.
+
+    ``set_key`` selects the transformation chain for the route-B cross-check
+    (CLPO only); without it the CLPO tag in the filename decides.
 
     Returns (header_lines, table_rows, totals_line).
     """
     base = derive_base(target.stem)
     d = target.parent
+    se = _SET_EXPORTS.get(set_key) if set_key else _set_from_stem(target.stem)
+    if se is not None and not se.sortable:
+        raise RuntimeError(
+            f"{se.tag} is a pre-orthogonalization intermediate set: it is "
+            "not orthonormal and its occupancies do not sum to the electron "
+            "count, so the pair-interaction analysis (E2, q) is not defined "
+            "for it."
+        )
     pure = pure or d / f"{base}.PURE"
     s_matrix = s_matrix or d / f"{base}.S.txt"
     fock_ao = fock_ao or d / f"{base}.fock_ao.txt"
@@ -1259,23 +1332,47 @@ def pair_interaction_analysis(
             or resid > SORT_FOCK_TOL * max(scale, 1.0)):
         raise RuntimeError("pair analysis validation FAILED: " + checks)
 
-    # optional independent route B: JANPA's own NAO data (wiki E2_pert recipe)
+    # optional independent route B from JANPA's own NAO data (wiki E2_pert
+    # recipe).  The path is set-specific: a NAO-space chain product
+    # (CLPO/LHO/AHO/LPO) is checked for orthonormality on the way; for NAO
+    # the F_NAO dump itself is the independent side; PNAO has no NAO-space
+    # path and skips the check with a note.
     nao = nao or d / f"{base}.fock_nao.txt"
-    clpo2lho = clpo2lho or d / f"{base}.clpo2lho.txt"
-    lho2nao = lho2nao or d / f"{base}.lho2nao.txt"
-    if all(p.is_file() for p in (nao, clpo2lho, lho2nao)):
-        F_NAO = read_matrix_dump(nao)
-        Cna = _matmul(read_matrix_dump(clpo2lho), read_matrix_dump(lho2nao))
-        dev_b = _max_dev_from_identity(_matmul(Cna, list(zip(*Cna))))
-        F_b = _matmul(Cna, _matmul(F_NAO, list(zip(*Cna))))
-        diff_b = max(abs(F_loc[i][j] - F_b[i][j])
-                     for i in range(n) for j in range(n))
-        scale_b = max(abs(F_loc[i][j]) for i in range(n) for j in range(n))
-        checks += (f" | route A vs B {diff_b:.2e} (max|F| {scale_b:.1f}, "
-                   f"basis {dev_b:.1e})")
-        if (dev_b > SORT_ORTHO_TOL
-                or diff_b > E2_ROUTE_TOL * max(scale_b, 1.0)):
-            raise RuntimeError("pair analysis validation FAILED: " + checks)
+    if se is None or se.chain is None:
+        checks += (" | route B skipped (no NAO-space transformation chain "
+                   "for this set)")
+    elif not nao.is_file():
+        checks += " | route B skipped (F_NAO dump missing)"
+    else:
+        chain_paths = [d / _DUMP_EXPORTS[c][1].format(b=base)
+                       for c in se.chain]
+        if not all(p.is_file() for p in chain_paths):
+            checks += (" | route B skipped (chain dumps missing: "
+                       + ", ".join(p.name for p in chain_paths
+                                   if not p.is_file()) + ")")
+        else:
+            F_NAO = read_matrix_dump(nao)
+            dev_b = None
+            if se.chain:
+                T = read_matrix_dump(chain_paths[0])
+                for p in chain_paths[1:]:
+                    T = _matmul(T, read_matrix_dump(p))
+                F_b = _matmul(T, _matmul(F_NAO, list(zip(*T))))
+                dev_b = _max_dev_from_identity(_matmul(T, list(zip(*T))))
+                what = "chain " + "+".join(se.chain)
+            else:
+                F_b = F_NAO          # NAO: the dump is the other path
+                what = "direct F_NAO dump"
+            diff_b = max(abs(F_loc[i][j] - F_b[i][j])
+                         for i in range(n) for j in range(n))
+            scale_b = max(abs(F_loc[i][j]) for i in range(n) for j in range(n))
+            checks += (f" | route A vs B {diff_b:.2e} ({what}, "
+                       f"max|F| {scale_b:.1f}"
+                       + (f", basis {dev_b:.1e}" if dev_b is not None else "")
+                       + ")")
+            if ((dev_b is not None and dev_b > SORT_ORTHO_TOL)
+                    or diff_b > E2_ROUTE_TOL * max(scale_b, 1.0)):
+                raise RuntimeError("pair analysis validation FAILED: " + checks)
 
     # labels and JANPA's own CT numbers -- only when the log describes
     # this exact export (occupancy fingerprint)
@@ -1385,10 +1482,12 @@ def pair_interaction_analysis(
 
 
 def _emit_e2(target: Path, pure: Path | None, s_matrix: Path | None,
-             fock_ao: Path | None, out: Path | None = None) -> Path:
+             fock_ao: Path | None, out: Path | None = None,
+             set_key: str | None = None) -> Path:
     """Print the pair-interaction report and write the table file."""
     header, table, totals = pair_interaction_analysis(target, pure, s_matrix,
-                                                      fock_ao)
+                                                      fock_ao,
+                                                      set_key=set_key)
     for line in header:
         print(line)
     for line in table[:25]:
@@ -1436,17 +1535,35 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Extra args passed through to janpa.jar after --",
     )
+    _set_blurb = {
+        "clpo": "the NBO-analog Lewis-like set (BD/NB/LP/RY); the only set "
+                "with CLPO labels in <base>.JANPA and a verified route-B "
+                "cross-check for --e2",
+        "lho": "localized hybrids (the atom-centered hybrids CLPOs are "
+               "built from)",
+        "aho": "atomic hybrids (the LPO-construction intermediate)",
+        "lpo": "property-optimized localized orbitals",
+        "nao": "natural atomic orbitals (the NPA/Wiberg set)",
+        "pnao": "pre-orthogonalization NAOs",
+    }
+    for _key, _se in _SET_EXPORTS.items():
+        ap.add_argument(
+            f"--{_key}",
+            action="store_true",
+            help=f"Pipeline mode: export the {_se.tag} set ({_set_blurb[_key]})."
+            f"  Writes <base>_{_se.tag}_spherical.molden (the substrate: "
+            f"JANPA's export with corrected markers/spin, kept as the "
+            f"analysis input) and <base>_{_se.tag}.molden (the viewer file: "
+            f"cartesian, real energies, occupied-first; integer Occup with "
+            f"--avogadro), plus the shared dumps (<base>.S.txt, "
+            f"<base>.fock_ao.txt, <base>.fock_nao.txt) and its "
+            f"transformation chain",
+        )
     ap.add_argument(
-        "--clpo",
+        "--all-sets",
         action="store_true",
-        help="Pipeline mode: export the CLPO set and the data the "
-        "analysis modes need.  Writes <base>_CLPO_spherical.molden (the "
-        "substrate: JANPA's export with corrected markers/spin, kept as "
-        "the analysis input) and <base>_CLPO.molden (the viewer file: "
-        "cartesian, real energies, occupied-first; integer Occup with "
-        "--avogadro), plus <base>.S.txt, <base>.fock_ao.txt, "
-        "<base>.fock_nao.txt, <base>.clpo2lho.txt, <base>.lho2nao.txt "
-        "and the labels in <base>.JANPA",
+        help="Pipeline mode for every JANPA orbital set at once: --clpo "
+        "--lho --aho --lpo --nao --pnao",
     )
     ap.add_argument(
         "--diagnose",
@@ -1559,17 +1676,20 @@ def main(argv: list[str] | None = None) -> None:
     ap = build_parser()
     args = ap.parse_args(argv)
 
+    sets = requested_sets(args)
     e2_inline = args.e2 == ""
-    if e2_inline and not args.clpo:
-        ap.error("--e2 without a file requires --clpo "
-                 "(it analyzes the export from this run)")
-    if args.e2 not in (None, "") and args.clpo:
-        ap.error("--e2 takes no file with --clpo (use bare --e2)")
-    if (args.avogadro and args.to_cart is None and not args.clpo):
-        ap.error("--avogadro applies to --to-cart and --clpo")
+    if e2_inline and not sets:
+        ap.error("--e2 without a file requires a set flag (--clpo/--lho/"
+                 "--aho/--lpo/--nao/--pnao/--all-sets); it analyzes the "
+                 "export from this run")
+    if args.e2 not in (None, "") and sets:
+        ap.error("--e2 takes no file with a set flag (use bare --e2)")
+    if args.avogadro and args.to_cart is None and not sets:
+        ap.error("--avogadro applies to --to-cart and the set flags")
     if (args.sort_energy and args.to_cart is None
-            and args.fix_markers is None and not args.clpo):
-        ap.error("--sort-energy applies to --to-cart/--fix-markers/--clpo")
+            and args.fix_markers is None and not sets):
+        ap.error("--sort-energy applies to --to-cart/--fix-markers and the "
+                 "set flags")
     if ((args.pure or args.s_matrix or args.fock_ao)
             and not (args.sort_energy or args.e2 is not None)):
         ap.error("--pure/--s-matrix/--fock-ao are --sort-energy/--e2 inputs")
@@ -1630,61 +1750,98 @@ def main(argv: list[str] | None = None) -> None:
         if args.janpa_args[:1] == ["--"]
         else args.janpa_args
     )
-    if args.clpo:
-        # CLPO export plus the dumps the analysis modes need: -doFock
-        # builds the Fock matrix from the .PURE orbital energies; the NAO
-        # Fock and the LHO transformation chain feed the independent
-        # route-B cross-check of --e2 (JANPA wiki "E2_pert" recipe).
-        # janpa writes the substrate; the viewer file is converted from it.
-        extra = [
-            "-CLPO_Molden_File", f"{base}_CLPO_spherical.molden",
-            "-doFock",
-            "-Fock_AO_File", f"{base}.fock_ao.txt",
-            "-Fock_NAO_File", f"{base}.fock_nao.txt",
-            "-CLPO2LHO_File", f"{base}.clpo2lho.txt",
-            "-LHO2NAO_File", f"{base}.lho2nao.txt",
-            "-S_Matrix_File", f"{base}.S.txt",
-            "-MatrixFloatNumberFormat", "%.9f",
-            "-RyOccPrintThreshold", "-1",
-        ] + extra
+    if sets:
+        # One Molden export per requested set plus the dumps the analysis
+        # modes need: -doFock builds the Fock matrix from the .PURE orbital
+        # energies; the Fock_NAO dump and the per-set transformation chains
+        # feed the route-B cross-check of --e2 (verified for CLPO; JANPA
+        # wiki "E2_pert" recipe).  janpa writes every substrate; the viewer
+        # files are converted from them.
+        chain_keys: list[str] = []
+        for k in sets:
+            for c in (_SET_EXPORTS[k].chain or ()):
+                if c not in chain_keys:
+                    chain_keys.append(c)
+        extra = []
+        for k in sets:
+            se = _SET_EXPORTS[k]
+            extra += [se.opt, f"{base}_{se.tag}_spherical.molden"]
+        extra += ["-doFock"]
+        for dk in ("fock_ao", "fock_nao", "s", *chain_keys):
+            opt, pat = _DUMP_EXPORTS[dk]
+            extra += [opt, pat.format(b=base)]
+        extra += ["-MatrixFloatNumberFormat", "%.9f",
+                  "-RyOccPrintThreshold", "-1"] + extra
     stdout = run_janpa(workdir, pure, janpa_jar, out_file, extra)
     # Print the electron-count + NPA summary lines as a quick receipt.
     for line in stdout.splitlines():
         if "Total number of electrons" in line or "Sum of electrons" in line:
             print("      " + line.strip())
     print(f"Done. JANPA output saved to {out_file}")
-    if args.clpo:
-        substrate = workdir / f"{base}_CLPO_spherical.molden"
-        viewer = workdir / f"{base}_CLPO.molden"
-        # Substrate: minimal sanitation only -- markers corrected to match
-        # the actual shells and the spin label corrected from the canonical
-        # source; JANPA's order, Ene placeholders and fractional Occup are
-        # kept.  This is the analysis input (same basis as the dumps).
-        spin = args.spin or resolve_spin_label(substrate,
-                                               workdir / f"{base}.PURE")
-        print("      " + fix_spherical_markers(substrate, substrate, spin))
-        # Viewer file: cartesian, real Fock energies, occupied-first order;
-        # --avogadro adds the integer-Occup workaround for Avogadro's
-        # electron-count bug (kept behind the flag until upstream fixes it).
-        sort = plan_orbital_order(substrate, args.pure, args.s_matrix,
-                                  args.fock_ao)
-        print(sort.report)
-        print("      " + convert_to_cart(
-            substrate, viewer,
-            spin or ("Alpha" if args.avogadro else None),
-            args.avogadro, sort))
-        print(f"Viewer file  : {viewer.name}  (cartesian, real energies, "
-              "occupied-first"
-              + (", integer Occup" if args.avogadro else "") + ")")
-        print(f"Substrate    : {substrate.name}  (spherical -- analysis "
-              "input)")
+    if sets:
+        for k in sets:
+            se = _SET_EXPORTS[k]
+            substrate = workdir / f"{base}_{se.tag}_spherical.molden"
+            viewer = workdir / f"{base}_{se.tag}.molden"
+            # Substrate: minimal sanitation only -- markers corrected to
+            # match the actual shells and the spin label corrected from the
+            # canonical source; JANPA's order, Ene placeholders and
+            # fractional Occup are kept.  Analysis input (same spherical
+            # basis as the dumps).
+            spin = args.spin or resolve_spin_label(substrate,
+                                                   workdir / f"{base}.PURE")
+            print("      " + fix_spherical_markers(substrate, substrate, spin))
+            if se.sortable:
+                # Viewer file: cartesian, real Fock energies, occupied-first;
+                # --avogadro adds the integer-Occup workaround for Avogadro's
+                # electron-count bug (kept behind the flag until upstream
+                # fixes it).
+                sort = plan_orbital_order(substrate, args.pure, args.s_matrix,
+                                          args.fock_ao)
+                print(sort.report)
+            else:
+                # Pre-orthogonalization intermediate (PNAO): not orthonormal,
+                # so no energy ordering and no pair analysis; report the
+                # measured facts instead of pretending.
+                sort = None
+                _S, _F, _eps, _Cm, Ct, _om, occ = _load_pair_inputs(
+                    substrate,
+                    args.pure or workdir / f"{base}.PURE",
+                    args.s_matrix or workdir / f"{base}.S.txt",
+                    args.fock_ao or workdir / f"{base}.fock_ao.txt")
+                orth = _max_dev_from_identity(
+                    _matmul(list(zip(*Ct)), _matmul(_S, Ct)))
+                print(f"sort  : none ({se.tag} is a pre-orthogonalization "
+                      f"intermediate: not orthonormal, max|C^T S C - I| "
+                      f"{orth:.1e}, sum(Occup) {sum(occ):.3f} e -- energy "
+                      f"ordering and pair analysis are not defined; JANPA "
+                      f"order kept)")
+            print("      " + convert_to_cart(
+                substrate, viewer,
+                spin or ("Alpha" if args.avogadro else None),
+                args.avogadro, sort))
+            print(f"Viewer file  : {viewer.name}  (cartesian"
+                  + (", real energies, occupied-first" if se.sortable
+                     else ", JANPA order")
+                  + (", integer Occup" if args.avogadro else "") + ")")
+            print(f"Substrate    : {substrate.name}  (spherical -- analysis "
+                  "input)")
+            if e2_inline:
+                if se.sortable:
+                    _emit_e2(substrate, args.pure, args.s_matrix,
+                             args.fock_ao,
+                             workdir / f"{base}_{se.tag}_E2.txt", set_key=k)
+                else:
+                    print(f"      {se.tag}_E2: skipped (pair analysis is "
+                          "not defined for this set)")
         print(f"Data         : {base}.S.txt, {base}.fock_ao.txt, "
-              f"{base}.fock_nao.txt, {base}.clpo2lho.txt, {base}.lho2nao.txt")
-        if e2_inline:
-            _emit_e2(substrate, args.pure, args.s_matrix, args.fock_ao,
-                     workdir / f"{base}_CLPO_E2.txt")
-        print(f"Next         : python {Path(sys.argv[0]).name} --e2 "
-              f"{base}_CLPO_spherical.molden")
+              f"{base}.fock_nao.txt"
+              + "".join(f", {base}.{c}.txt" for c in chain_keys))
+        _first = next((_SET_EXPORTS[k] for k in sets
+                       if _SET_EXPORTS[k].sortable), None)
+        if _first is not None:
+            print(f"Next         : python {Path(sys.argv[0]).name} --e2 "
+                  f"{base}_{_first.tag}_spherical.molden")
 
 
 if __name__ == "__main__":

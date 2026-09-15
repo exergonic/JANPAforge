@@ -1,7 +1,7 @@
 pair-interaction analysis  [formaldehyde_CLPO_spherical.molden]
 inputs : formaldehyde.S.txt, formaldehyde.fock_ao.txt, formaldehyde.PURE
 check  : JANPA CT reproduced 3/3 printed pairs (max |dq| 1.4e-06)
-gates  : formaldehyde_CLPO_spherical.molden orthonormality 5.84e-08 | formaldehyde.PURE orthonormality 4.87e-08 | F C - S C eps 9.01e-08 (scale 18.28) | route A vs B 1.04e-07 (max|F| 37.9, basis 1.4e-09)
+gates  : formaldehyde_CLPO_spherical.molden orthonormality 5.84e-08 | formaldehyde.PURE orthonormality 4.87e-08 | F C - S C eps 9.01e-08 (scale 18.28) | route A vs B 1.04e-07 (chain clpo2lho+lho2nao, max|F| 37.9, basis 1.4e-09)
 note   : E2 = n_i F_ij^2/(F_jj-F_ii) is a perturbation estimate with a well-defined
          meaning in Hartree-Fock; under DFT the 'Fock' operator belongs to the
          auxiliary Kohn-Sham system, so read E2 with care there and prefer the

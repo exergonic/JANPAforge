@@ -20,8 +20,8 @@ Settings used in this run:
 
  -i: C:\Users\mccan\orca_calcs\ethylium\ethylium.PURE
  -npacharges: (empty)
- -NAO_Molden_File: (empty)
- -LHO_Molden_File: (empty)
+ -NAO_Molden_File: ethylium_NAO_spherical.molden
+ -LHO_Molden_File: ethylium_LHO_spherical.molden
  -CLPO_Molden_File: ethylium_CLPO_spherical.molden
  -PrintGeom: false
  -WibergBondOrders_File: (empty)
@@ -47,15 +47,15 @@ Settings used in this run:
  -PNAO2AO_File: (empty)
  -CLPO2LHO_File: ethylium.clpo2lho.txt
  -LHO2NAO_File: ethylium.lho2nao.txt
- -LPO2AHO_File: (empty)
- -AHO2NAO_File: (empty)
+ -LPO2AHO_File: ethylium.lpo2aho.txt
+ -AHO2NAO_File: ethylium.aho2nao.txt
  -doFock: true
  -Fock_AO_File: ethylium.fock_ao.txt
  -Fock_NAO_File: ethylium.fock_nao.txt
  -printnmbfock: false
- -PNAO_Molden_File: (empty)
- -AHO_Molden_File: (empty)
- -LPO_Molden_File: (empty)
+ -PNAO_Molden_File: ethylium_PNAO_spherical.molden
+ -AHO_Molden_File: ethylium_AHO_spherical.molden
+ -LPO_Molden_File: ethylium_LPO_spherical.molden
  -MatrixMaxValuesPerLine: 0
  -MatrixFloatNumberFormat: %.9f
  -maximumBondIonicity: 9.00E-01
@@ -81,7 +81,7 @@ Data loaded successfully
  Number of basis functions: 92; number of molecular orbitals: 92 
 
 Building overlap S and dipole matrices...
-Overlap & dipole integrals evaluated in 0.013 seconds
+Overlap & dipole integrals evaluated in 0.009 seconds
 Checking whether the basis functions are unity-normalized...
  Maximum deviation of the basis function norm2 from unity: BFN 11 (0-based num.), max|norm2-1| = 1.000E-09 
 Checking for the eigenvalues (linear (in)dependency) of the basis function overlap matrix...
@@ -751,20 +751,39 @@ NAO	          Label	Host	occup.	<NAO|F|NAO>
 90	  A7*: R42*p(0)	7	0.0000873	1.9681098
 91	  A7*: R42*p(1)	7	0.0001151	2.1884235
 92	 A7*: R42*p(-1)	7	0.0004726	2.4008981
+Writing PNAOs to	ethylium_PNAO_spherical.molden
+Note: diagonal elements of the Fock matrix in PNAO baiss will be used as PNAO energies
+Writing NAOs to	ethylium_NAO_spherical.molden
+Note: diagonal elements of the Fock matrix in NAO baiss will be used as NAO energies
 
 Exporting matrix "CLPOs in LHO basis" to ethylium.clpo2lho.txt
 done
 
 Exporting matrix "LHOs in NAO basis" to ethylium.lho2nao.txt
 done
+
+Exporting matrix "LPOs in AHO basis" to ethylium.lpo2aho.txt
+done
+
+Exporting matrix "AHOs in NAO basis" to ethylium.aho2nao.txt
+done
+Writing LHOs to	ethylium_LHO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
 Writing CLPOs to	ethylium_CLPO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing AHOs to	ethylium_AHO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing LPOs to	ethylium_LPO_spherical.molden
 Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
 
 
 
 0 warning(s)
 
-Total run time: 0 min, 0.7 sec
+Total run time: 0 min, 0.8 sec
 
 
                           * * *                                         

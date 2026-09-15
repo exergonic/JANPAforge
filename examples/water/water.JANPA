@@ -20,8 +20,8 @@ Settings used in this run:
 
  -i: C:\Users\mccan\orca_calcs\water\water.PURE
  -npacharges: (empty)
- -NAO_Molden_File: (empty)
- -LHO_Molden_File: (empty)
+ -NAO_Molden_File: water_NAO_spherical.molden
+ -LHO_Molden_File: water_LHO_spherical.molden
  -CLPO_Molden_File: water_CLPO_spherical.molden
  -PrintGeom: false
  -WibergBondOrders_File: (empty)
@@ -47,15 +47,15 @@ Settings used in this run:
  -PNAO2AO_File: (empty)
  -CLPO2LHO_File: water.clpo2lho.txt
  -LHO2NAO_File: water.lho2nao.txt
- -LPO2AHO_File: (empty)
- -AHO2NAO_File: (empty)
+ -LPO2AHO_File: water.lpo2aho.txt
+ -AHO2NAO_File: water.aho2nao.txt
  -doFock: true
  -Fock_AO_File: water.fock_ao.txt
  -Fock_NAO_File: water.fock_nao.txt
  -printnmbfock: false
- -PNAO_Molden_File: (empty)
- -AHO_Molden_File: (empty)
- -LPO_Molden_File: (empty)
+ -PNAO_Molden_File: water_PNAO_spherical.molden
+ -AHO_Molden_File: water_AHO_spherical.molden
+ -LPO_Molden_File: water_LPO_spherical.molden
  -MatrixMaxValuesPerLine: 0
  -MatrixFloatNumberFormat: %.9f
  -maximumBondIonicity: 9.00E-01
@@ -81,7 +81,7 @@ Data loaded successfully
  Number of basis functions: 24; number of molecular orbitals: 24 
 
 Building overlap S and dipole matrices...
-Overlap & dipole integrals evaluated in 0.000 seconds
+Overlap & dipole integrals evaluated in 0.002 seconds
 Checking whether the basis functions are unity-normalized...
  Maximum deviation of the basis function norm2 from unity: BFN 6 (0-based num.), max|norm2-1| = 4.000E-10 
 Checking for the eigenvalues (linear (in)dependency) of the basis function overlap matrix...
@@ -425,13 +425,32 @@ NAO	          Label	Host	occup.	<NAO|F|NAO>
 22	  A3*: R12*p(0)	3	0.0020939	2.6059337
 23	  A3*: R12*p(1)	3	0.0011797	1.9464039
 24	 A3*: R12*p(-1)	3	0.0011693	2.2880523
+Writing PNAOs to	water_PNAO_spherical.molden
+Note: diagonal elements of the Fock matrix in PNAO baiss will be used as PNAO energies
+Writing NAOs to	water_NAO_spherical.molden
+Note: diagonal elements of the Fock matrix in NAO baiss will be used as NAO energies
 
 Exporting matrix "CLPOs in LHO basis" to water.clpo2lho.txt
 done
 
 Exporting matrix "LHOs in NAO basis" to water.lho2nao.txt
 done
+
+Exporting matrix "LPOs in AHO basis" to water.lpo2aho.txt
+done
+
+Exporting matrix "AHOs in NAO basis" to water.aho2nao.txt
+done
+Writing LHOs to	water_LHO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
 Writing CLPOs to	water_CLPO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing AHOs to	water_AHO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing LPOs to	water_LPO_spherical.molden
 Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
 
 

@@ -8,13 +8,14 @@ place using only the files in the folder:
 ```powershell
 cd ethene
 # re-create the viewer file from the substrate:
-python ../orca_to_janpa.py --to-cart ethene_CLPO_spherical.molden --sort-energy --avogadro
+python ../../orca_to_janpa.py --to-cart ethene_CLPO_spherical.molden --sort-energy --avogadro
 # re-run the interaction table:
-python ../orca_to_janpa.py --e2 ethene_CLPO_spherical.molden
+python ../../orca_to_janpa.py --e2 ethene_CLPO_spherical.molden
 ```
 
 (The originals of these files live in the ORCA calculation folders; these
-copies are the pipeline artifacts as produced.)
+copies are the pipeline artifacts as produced. Every set works the same
+way — swap `CLPO` for `LHO`, `AHO`, `LPO`, `NAO` or `PNAO`.)
 
 ## Files in each folder
 
@@ -22,22 +23,22 @@ copies are the pipeline artifacts as produced.)
 | --- | --- | --- |
 | `<mol>.molden.input` | `orca_2mkl` | SCF MOs + basis, ORCA flavour |
 | `<mol>.PURE` | `molden2molden` | canonical Molden; janpa input, and the canonical reference for `--sort-energy` / `--e2` |
-| `<mol>_CLPO_spherical.molden` | `janpa` + label fixes | the **substrate**: spherical d/f, `Ene=` = sequential numbers, markers + `Spin=` corrected; the analysis input |
+| `<mol>_<SET>_spherical.molden` | `janpa` + label fixes | the **substrate** for set `<SET>` (CLPO, LHO, AHO, LPO, NAO, PNAO): spherical d/f, `Ene=` = sequential numbers, markers + `Spin=` corrected; the analysis input |
 | `<mol>.JANPA` | janpa stdout | NPA charges, Wiberg bond indices, full CLPO labels, JANPA's own charge-transfer table |
 | `<mol>.S.txt`, `<mol>.fock_ao.txt` | `janpa -doFock` | overlap / Fock in the AO basis (spherical, [GTO] order) |
-| `<mol>.fock_nao.txt`, `<mol>.clpo2lho.txt`, `<mol>.lho2nao.txt` | `janpa -doFock` | NAO Fock and the LHO transformation chain (route-B cross-check inside `--e2`) |
-| `<mol>_CLPO_E2.txt` | `--e2` | pair-interaction table: E2 (kcal/mol) + charge transfer q (e) |
-| `<mol>_CLPO.molden` | `--clpo` | **the viewer file**: cartesian d/f, markers clean, real Fock energies, occupied-first order; generated with `--avogadro` in these copies (integer `Occup`) — **open this one in Avogadro** |
+| `<mol>.fock_nao.txt`, `<mol>.clpo2lho.txt`, `<mol>.lho2nao.txt`, `<mol>.aho2nao.txt`, `<mol>.lpo2aho.txt` | `janpa -doFock` | NAO Fock and the transformation chains (per-set route-B cross-checks inside `--e2`) |
+| `<mol>_CLPO_E2.txt` | `--e2` | pair-interaction table: E2 (kcal/mol) + charge transfer q (e); any other set runs the same way |
+| `<mol>_<SET>.molden` | `<SET>` flag | **the viewer file** for set `<SET>`: cartesian d/f, markers clean, real Fock energies, occupied-first order; generated with `--avogadro` in these copies (integer `Occup`) — **open these in Avogadro**. `PNAO` keeps JANPA's order: the pre-orthogonalization set is not orthonormal, so no energy ordering exists for it |
 | `water_CLPO_Alpha.molden` (water only) | `--clpo` without `--avogadro` | cartesian + fractional `Occup`: the repro file for the Avogadro electron-counting bug |
 | `<mol>.xyz` | ORCA | geometry |
 
-Every folder carries the complete set: the substrate, the viewer file, the
-dumps, the E2 table and the labels. To regenerate the viewer file with the
-true fractional `Occup` (instead of the Avogadro `2/0`), rerun it from the
-substrate:
+Every folder carries the complete set for all six JANPA sets (viewer +
+substrate each), the dumps and transformation chains, the CLPO E2 table
+and the labels. To regenerate a viewer file with the true fractional
+`Occup` (instead of the Avogadro `2/0`), rerun it from the substrate:
 
 ```powershell
-python ../orca_to_janpa.py --to-cart ethene_CLPO_spherical.molden --sort-energy
+python ../../orca_to_janpa.py --to-cart ethene_CLPO_spherical.molden --sort-energy
 ```
 
 ## The molecules

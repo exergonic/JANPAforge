@@ -20,21 +20,22 @@ What it does per `<base>`:
   (add `--dot47 file.47` for the correlated `-ds47` route)
 - `[3/3]` runs `janpa -i <base>.PURE`, saves `<base>.JANPA`
 
-Add `--clpo` to also export the viewer file, the retained spherical
-substrate, and the data the analysis modes need (see "Viewing orbitals"
-and "Orbital-interaction analysis"):
+Add one set flag per JANPA orbital set to also export its viewer file, its
+retained spherical substrate, and the data the analysis modes need (see
+"Viewing orbitals" and "Orbital-interaction analysis"):
 
 ```powershell
-python orca_to_janpa.py ethene --clpo --avogadro --e2
-# -> ethene_CLPO.molden            the viewer file: cartesian d/f,
-#                                  corrected Spin=, real energies,
-#                                  occupied-first; integer Occup with
-#                                  --avogadro (the Avogadro workaround)
-# -> ethene_CLPO_spherical.molden  the substrate: JANPA's export with
-#                                  corrected markers/Spin (analysis input)
-# -> ethene.S.txt, ethene.fock_ao.txt, ethene.fock_nao.txt,
-#    ethene.clpo2lho.txt, ethene.lho2nao.txt           (janpa dumps)
-# -> ethene_CLPO_E2.txt            with --e2: the pair-interaction table
+python orca_to_janpa.py ethene --clpo --lho --nao --avogadro --e2
+# (--all-sets is shorthand for all six: clpo, lho, aho, lpo, nao, pnao)
+# -> ethene_<SET>.molden            the viewer file: cartesian d/f,
+#                                   corrected Spin=, real energies,
+#                                   occupied-first; integer Occup with
+#                                   --avogadro (the Avogadro workaround)
+# -> ethene_<SET>_spherical.molden  the substrate: JANPA's export with
+#                                   corrected markers/Spin (analysis input)
+# -> ethene.S.txt, ethene.fock_ao.txt, ethene.fock_nao.txt and the
+#    transformation chains of the requested sets    (janpa dumps)
+# -> ethene_<SET>_E2.txt            with --e2: the pair-interaction table
 #    and the full CLPO labels in ethene.JANPA
 ```
 
@@ -58,22 +59,33 @@ Raw JANPA exports have two universal defects — spherical d/f coefficients
 (Avogadro renders cartesian only) and wrong marker lines (JANPA omits
 `[7F]` and writes a spurious `[9G]`, which mistracks f shells in readers
 that honor markers). Both fixes are applied **by default** by the pipeline.
-`--clpo` writes exactly two Molden files per localization set:
+Every set flag (`--clpo`, `--lho`, `--aho`, `--lpo`, `--nao`, `--pnao`, or
+`--all-sets`) writes exactly two Molden files for its set:
 
-- `<base>_CLPO.molden` — **the viewer file**: cartesian d/f, markers
+- `<base>_<SET>.molden` — **the viewer file**: cartesian d/f, markers
   clean, `Spin=` corrected from the canonical source, real Fock energies,
-  occupied-first order (see "Orbital order and energies"). One file, one
-  name, works in every Molden reader. With `--avogadro` the very same file
-  instead gets integer `Occup= 2/0`, because Avogadro parses `Occup` as int
-  (1.986 → 1, miscounting 16 electrons as 8) and fills orbitals
-  positionally, so fractional occupations mislabel occupied/virtual. Same
-  filename either way — drop the flag when the upstream bug is fixed.
-- `<base>_CLPO_spherical.molden` — the **analysis substrate**: JANPA's
+  occupied-first order (see "Orbital order and energies"). One file per
+  set, one name each, works in every Molden reader. With `--avogadro` the
+  very same file instead gets integer `Occup= 2/0`, because Avogadro
+  parses `Occup` as int (1.986 → 1, miscounting 16 electrons as 8) and
+  fills orbitals positionally, so fractional occupations mislabel
+  occupied/virtual. Same filename either way — drop the flag when the
+  upstream bug is fixed.
+- `<base>_<SET>_spherical.molden` — the **analysis substrate**: JANPA's
   export with only the two corrected labels (markers, `Spin=`); JANPA's
   order, sequential `Ene=` values and fractional `Occup` stay exactly as
   written. It is the input for `--e2` / `--sort-energy` (same spherical
   basis as the `-doFock` dumps) and for further analysis with JANPA or
   other tools; a rerun regenerates it byte-identically from `<base>.PURE`.
+
+`--pnao` is the exception on the *analysis* side: PNAO is the
+pre-orthogonalization intermediate of the NAO construction, so it is not
+an orthonormal set (for water: max |Cᵀ S C − I| = 4.8e-01, occupancies
+summing to 14.54 e instead of 10). Its viewer file therefore keeps JANPA's
+order and sequential `Ene=` placeholders — energy ordering and pair
+analysis are both undefined for it. The convention fixes (cartesian d/f,
+markers, `Spin=`) apply as usual, and the run prints the measured numbers
+when it skips the rest.
 
 The standalone converters remain for re-processing existing files:
 
@@ -165,9 +177,14 @@ of any JANPA export and writes `<stem>_E2.txt`:
 
 `--e2` gates everything the way `--sort-energy` does, plus an independent
 cross-check of the whole Fock matrix against JANPA's own NAO data (the
-`E2_pert` recipe: `<base>.fock_nao.txt` transformed with
-`<base>.clpo2lho.txt` @ `<base>.lho2nao.txt`), and it refuses to write on
-mismatch.
+`E2_pert` recipe: `<base>.fock_nao.txt` transformed with the set's chain —
+`clpo2lho` @ `lho2nao` for CLPO, `lho2nao` for LHO, `aho2nao` for AHO,
+`lpo2aho` @ `aho2nao` for LPO, the F_NAO dump itself for NAO), and it
+refuses to write on mismatch. PNAO has no NAO-space path *and* is not
+orthonormal: `--e2` refuses it with that explanation. JANPA's own CT
+table only describes the CLPO set, so the printed-pair cross-check and
+the labels apply there; other sets verify through the route-B chain and
+report "labels/CT check skipped".
 
 Numbers from this folder (wB97X-D3/def2-TZVP): isobutene sigma(C-H) ->
 pi*(C=C) ~5 kcal/mol per methyl C-H; formaldehyde O lone pair ->
@@ -176,22 +193,34 @@ sigma*(C-H) ~29 kcal/mol; tert-butyl cation sigma(C-H) -> empty-p
 
 ### Which JANPA orbital set (all work with the viewer/analysis modes)
 
+One flag per set — `--nao`, `--pnao`, `--lho`, `--aho`, `--lpo`, `--clpo`
+(or `--all-sets`) — each producing the viewer + substrate pair described
+above:
+
 - **NAO** (natural atomic orbitals) — the orthonormal atomic set behind NPA
   charges, Wiberg bond indices, angular-momentum populations
-  (`-NAO_Molden_File`, Fock: `<base>.fock_nao.txt`).
+  (`-NAO_Molden_File`, Fock: `<base>.fock_nao.txt`; its `--e2` route-B
+  check compares the F_NAO dump directly).
 - **PNAO** — pre-orthogonalization NAOs; NAO-construction intermediate.
+  Not orthonormal by construction: viewer + substrate only, no energy
+  ordering and no pair analysis (see "Viewing orbitals").
 - **LHO** (localized hybrid orbitals) — the atom-centred hybrids the CLPOs
   are built from (`-LHO_Molden_File`; `<base>.lho2nao.txt` = LHOs in the
   NAO basis).
 - **AHO / LPO** — the LPO family (Int J Quantum Chem 2019, e25798);
-  property-optimized localized orbitals and their atomic hybrids.
+  property-optimized localized orbitals and their atomic hybrids
+  (`-AHO2NAO_File`, `-LPO2AHO_File` = their transformation chains).
 - **CLPO** ("chemist's LPO") — the NBO-analog Lewis-like set (BD/NB/LP/RY);
-  the one to use for bonding analysis, orbital visualization and `--e2`.
+  the one to use for bonding analysis, orbital visualization and the full
+  `--e2` treatment (CLPO labels and the printed CT table live in
+  `<base>.JANPA`).
 
 The naive approach of just running `janpa` and reading the files also
 needs: the janpa stdout (`<base>.JANPA`) for labels, and a `-doFock` run
-for the matrices (`-Fock_AO_File`, `-Fock_NAO_File`, `-S_Matrix_File`,
-`-CLPO2LHO_File`, `-LHO2NAO_File`; `-doFock` is a bare flag).
+for the matrices (`-Fock_AO_File`, `-Fock_NAO_File`, `-S_Matrix_File` plus
+the transformation chain of whichever set: `-CLPO2LHO_File`,
+`-LHO2NAO_File`, `-AHO2NAO_File`, `-LPO2AHO_File`; `-doFock` is a bare
+flag).
 
 ## Project rules
 

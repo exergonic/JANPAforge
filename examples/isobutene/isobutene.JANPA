@@ -20,8 +20,8 @@ Settings used in this run:
 
  -i: C:\Users\mccan\orca_calcs\isobutene\isobutene.PURE
  -npacharges: (empty)
- -NAO_Molden_File: (empty)
- -LHO_Molden_File: (empty)
+ -NAO_Molden_File: isobutene_NAO_spherical.molden
+ -LHO_Molden_File: isobutene_LHO_spherical.molden
  -CLPO_Molden_File: isobutene_CLPO_spherical.molden
  -PrintGeom: false
  -WibergBondOrders_File: (empty)
@@ -47,15 +47,15 @@ Settings used in this run:
  -PNAO2AO_File: (empty)
  -CLPO2LHO_File: isobutene.clpo2lho.txt
  -LHO2NAO_File: isobutene.lho2nao.txt
- -LPO2AHO_File: (empty)
- -AHO2NAO_File: (empty)
+ -LPO2AHO_File: isobutene.lpo2aho.txt
+ -AHO2NAO_File: isobutene.aho2nao.txt
  -doFock: true
  -Fock_AO_File: isobutene.fock_ao.txt
  -Fock_NAO_File: isobutene.fock_nao.txt
  -printnmbfock: false
- -PNAO_Molden_File: (empty)
- -AHO_Molden_File: (empty)
- -LPO_Molden_File: (empty)
+ -PNAO_Molden_File: isobutene_PNAO_spherical.molden
+ -AHO_Molden_File: isobutene_AHO_spherical.molden
+ -LPO_Molden_File: isobutene_LPO_spherical.molden
  -MatrixMaxValuesPerLine: 0
  -MatrixFloatNumberFormat: %.9f
  -maximumBondIonicity: 9.00E-01
@@ -81,7 +81,7 @@ Data loaded successfully
  Number of basis functions: 172; number of molecular orbitals: 172 
 
 Building overlap S and dipole matrices...
-Overlap & dipole integrals evaluated in 0.016 seconds
+Overlap & dipole integrals evaluated in 0.021 seconds
 Checking whether the basis functions are unity-normalized...
  Maximum deviation of the basis function norm2 from unity: BFN 11 (0-based num.), max|norm2-1| = 1.000E-09 
 Checking for the eigenvalues (linear (in)dependency) of the basis function overlap matrix...
@@ -1099,20 +1099,39 @@ NAO	          Label	Host	occup.	<NAO|F|NAO>
 170	 A12*: R76*p(0)	12	0.0005120	2.7809967
 171	 A12*: R76*p(1)	12	0.0001904	2.6350015
 172	A12*: R76*p(-1)	12	0.0001252	2.1864324
+Writing PNAOs to	isobutene_PNAO_spherical.molden
+Note: diagonal elements of the Fock matrix in PNAO baiss will be used as PNAO energies
+Writing NAOs to	isobutene_NAO_spherical.molden
+Note: diagonal elements of the Fock matrix in NAO baiss will be used as NAO energies
 
 Exporting matrix "CLPOs in LHO basis" to isobutene.clpo2lho.txt
 done
 
 Exporting matrix "LHOs in NAO basis" to isobutene.lho2nao.txt
 done
+
+Exporting matrix "LPOs in AHO basis" to isobutene.lpo2aho.txt
+done
+
+Exporting matrix "AHOs in NAO basis" to isobutene.aho2nao.txt
+done
+Writing LHOs to	isobutene_LHO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
 Writing CLPOs to	isobutene_CLPO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing AHOs to	isobutene_AHO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing LPOs to	isobutene_LPO_spherical.molden
 Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
 
 
 
 0 warning(s)
 
-Total run time: 0 min, 1.2 sec
+Total run time: 0 min, 1.6 sec
 
 
                           * * *                                         

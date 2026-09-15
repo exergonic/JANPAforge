@@ -20,8 +20,8 @@ Settings used in this run:
 
  -i: C:\Users\mccan\orca_calcs\tbutyl\tbutyl.PURE
  -npacharges: (empty)
- -NAO_Molden_File: (empty)
- -LHO_Molden_File: (empty)
+ -NAO_Molden_File: tbutyl_NAO_spherical.molden
+ -LHO_Molden_File: tbutyl_LHO_spherical.molden
  -CLPO_Molden_File: tbutyl_CLPO_spherical.molden
  -PrintGeom: false
  -WibergBondOrders_File: (empty)
@@ -47,15 +47,15 @@ Settings used in this run:
  -PNAO2AO_File: (empty)
  -CLPO2LHO_File: tbutyl.clpo2lho.txt
  -LHO2NAO_File: tbutyl.lho2nao.txt
- -LPO2AHO_File: (empty)
- -AHO2NAO_File: (empty)
+ -LPO2AHO_File: tbutyl.lpo2aho.txt
+ -AHO2NAO_File: tbutyl.aho2nao.txt
  -doFock: true
  -Fock_AO_File: tbutyl.fock_ao.txt
  -Fock_NAO_File: tbutyl.fock_nao.txt
  -printnmbfock: false
- -PNAO_Molden_File: (empty)
- -AHO_Molden_File: (empty)
- -LPO_Molden_File: (empty)
+ -PNAO_Molden_File: tbutyl_PNAO_spherical.molden
+ -AHO_Molden_File: tbutyl_AHO_spherical.molden
+ -LPO_Molden_File: tbutyl_LPO_spherical.molden
  -MatrixMaxValuesPerLine: 0
  -MatrixFloatNumberFormat: %.9f
  -maximumBondIonicity: 9.00E-01
@@ -81,7 +81,7 @@ Data loaded successfully
  Number of basis functions: 178; number of molecular orbitals: 178 
 
 Building overlap S and dipole matrices...
-Overlap & dipole integrals evaluated in 0.006 seconds
+Overlap & dipole integrals evaluated in 0.022 seconds
 Checking whether the basis functions are unity-normalized...
  Maximum deviation of the basis function norm2 from unity: BFN 11 (0-based num.), max|norm2-1| = 1.000E-09 
 Checking for the eigenvalues (linear (in)dependency) of the basis function overlap matrix...
@@ -1147,20 +1147,39 @@ NAO	          Label	Host	occup.	<NAO|F|NAO>
 176	 A13*: R80*p(0)	13	0.0003440	2.3996560
 177	 A13*: R80*p(1)	13	0.0000655	2.0947775
 178	A13*: R80*p(-1)	13	0.0002768	2.3762248
+Writing PNAOs to	tbutyl_PNAO_spherical.molden
+Note: diagonal elements of the Fock matrix in PNAO baiss will be used as PNAO energies
+Writing NAOs to	tbutyl_NAO_spherical.molden
+Note: diagonal elements of the Fock matrix in NAO baiss will be used as NAO energies
 
 Exporting matrix "CLPOs in LHO basis" to tbutyl.clpo2lho.txt
 done
 
 Exporting matrix "LHOs in NAO basis" to tbutyl.lho2nao.txt
 done
+
+Exporting matrix "LPOs in AHO basis" to tbutyl.lpo2aho.txt
+done
+
+Exporting matrix "AHOs in NAO basis" to tbutyl.aho2nao.txt
+done
+Writing LHOs to	tbutyl_LHO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
 Writing CLPOs to	tbutyl_CLPO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing AHOs to	tbutyl_AHO_spherical.molden
+Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
+
+Writing LPOs to	tbutyl_LPO_spherical.molden
 Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
 
 
 
 0 warning(s)
 
-Total run time: 0 min, 1.4 sec
+Total run time: 0 min, 1.9 sec
 
 
                           * * *                                         
