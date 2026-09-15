@@ -28,7 +28,7 @@ way — swap `CLPO` for `LHO`, `AHO`, `LPO`, `NAO` or `PNAO`.)
 | `<mol>.S.txt`, `<mol>.fock_ao.txt` | `janpa -doFock` | overlap / Fock in the AO basis (spherical, [GTO] order) |
 | `<mol>.fock_nao.txt`, `<mol>.clpo2lho.txt`, `<mol>.lho2nao.txt`, `<mol>.aho2nao.txt`, `<mol>.lpo2aho.txt` | `janpa -doFock` | NAO Fock and the transformation chains (per-set route-B cross-checks inside `--e2`) |
 | `<mol>_CLPO_E2.txt` | `--e2` | pair-interaction table: E2 (kcal/mol) + charge transfer q (e); any other set runs the same way |
-| `<mol>_<SET>.molden` | `<SET>` flag | **the viewer file** for set `<SET>`: cartesian d/f, markers clean, real Fock energies, occupied-first order; generated with `--avogadro` in these copies (integer `Occup`) — **open these in Avogadro**. `PNAO` keeps JANPA's order: the pre-orthogonalization set is not orthonormal, so no energy ordering exists for it |
+| `<mol>_<SET>.molden` | `<SET>` flag | **the viewer file** for set `<SET>`: cartesian d/f, markers clean, real Fock energies, occupied-first order; generated with `--avogadro` in these copies (integer `Occup`) — **open these in Avogadro**. `PNAO` is energy-sorted like the rest; it is the pre-orthogonalization set (normalized but mutually non-orthogonal, `Occup` not summing to the electron count), so its run report states that and `--e2` is undefined for it |
 | `water_CLPO_Alpha.molden` (water only) | `--clpo` without `--avogadro` | cartesian + fractional `Occup`: the repro file for the Avogadro electron-counting bug |
 | `<mol>.xyz` | ORCA | geometry |
 

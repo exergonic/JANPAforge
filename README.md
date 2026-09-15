@@ -78,14 +78,16 @@ Every set flag (`--clpo`, `--lho`, `--aho`, `--lpo`, `--nao`, `--pnao`, or
   basis as the `-doFock` dumps) and for further analysis with JANPA or
   other tools; a rerun regenerates it byte-identically from `<base>.PURE`.
 
-`--pnao` is the exception on the *analysis* side: PNAO is the
-pre-orthogonalization intermediate of the NAO construction, so it is not
-an orthonormal set (for water: max |Cᵀ S C − I| = 4.8e-01, occupancies
-summing to 14.54 e instead of 10). Its viewer file therefore keeps JANPA's
-order and sequential `Ene=` placeholders — energy ordering and pair
-analysis are both undefined for it. The convention fixes (cartesian d/f,
-markers, `Spin=`) apply as usual, and the run prints the measured numbers
-when it skips the rest.
+`--pnao` is the exception, and only in one respect: PNAO is the
+pre-orthogonalization intermediate of the NAO construction — its orbitals
+are normalized but **mutually non-orthogonal** (water: max |CᵀS C − I| =
+4.8e-01) and its occupancies do not sum to the electron count (14.54 e
+for water's 10). The viewer file gets the full treatment including the
+energy sort — E = ⟨φ|F|φ⟩ is a well-defined single-orbital expectation
+value, gate-verified against the canonical expansion (5.2e-09 on water) —
+but the sort report states the non-orthogonality instead of gating on it,
+and the pair-interaction analysis (`--e2`) refuses PNAO files with that
+explanation.
 
 The standalone converters remain for re-processing existing files:
 
@@ -202,8 +204,9 @@ above:
   (`-NAO_Molden_File`, Fock: `<base>.fock_nao.txt`; its `--e2` route-B
   check compares the F_NAO dump directly).
 - **PNAO** — pre-orthogonalization NAOs; NAO-construction intermediate.
-  Not orthonormal by construction: viewer + substrate only, no energy
-  ordering and no pair analysis (see "Viewing orbitals").
+  Normalized but mutually non-orthogonal by construction: viewer +
+  substrate with the energy sort, but no pair analysis (see "Viewing
+  orbitals").
 - **LHO** (localized hybrid orbitals) — the atom-centred hybrids the CLPOs
   are built from (`-LHO_Molden_File`; `<base>.lho2nao.txt` = LHOs in the
   NAO basis).

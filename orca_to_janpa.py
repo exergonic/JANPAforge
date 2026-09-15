@@ -759,29 +759,34 @@ _CLASS_RANK = {"BD": 0, "LP": 0, "NB": 1, "RY": 2}
 # The JANPA Molden exports this script can carry through the viewer/analysis
 # pipeline.
 class SetExport(NamedTuple):
-    """One JANPA orbital set: tag, janpa option, route-B chain, sortability.
+    """One JANPA orbital set: tag, janpa option, route-B chain, capabilities.
 
     ``chain`` is the NAO-space transformation chain that route B of --e2
     uses (an empty tuple means the F_NAO dump itself is the check, i.e.
-    the NAO set; None means no route-B check is possible).  ``sortable``
-    is False for the pre-orthogonalization intermediate PNAO, for which
-    energy ordering and pair analysis are not defined.
+    the NAO set; None means no route-B check is possible).  ``orthonormal``
+    is False for the pre-orthogonalization intermediate PNAO: its orbitals
+    are normalized but mutually non-orthogonal, so the orthonormality gate
+    is relaxed for it (normalized orbitals still have a well-defined
+    E = <phi|F|phi>, so the energy sort stays valid).  ``pair`` is False
+    where the pair-interaction analysis (E2, q) is not defined: PNAO only.
     """
 
     tag: str
     opt: str
     chain: tuple[str, ...] | None
-    sortable: bool
+    orthonormal: bool
+    pair: bool
 
 
 _SET_EXPORTS = {
     "clpo": SetExport("CLPO", "-CLPO_Molden_File",
-                      ("clpo2lho", "lho2nao"), True),
-    "lho":  SetExport("LHO", "-LHO_Molden_File", ("lho2nao",), True),
-    "aho":  SetExport("AHO", "-AHO_Molden_File", ("aho2nao",), True),
-    "lpo":  SetExport("LPO", "-LPO_Molden_File", ("lpo2aho", "aho2nao"), True),
-    "nao":  SetExport("NAO", "-NAO_Molden_File", (), True),
-    "pnao": SetExport("PNAO", "-PNAO_Molden_File", None, False),
+                      ("clpo2lho", "lho2nao"), True, True),
+    "lho":  SetExport("LHO", "-LHO_Molden_File", ("lho2nao",), True, True),
+    "aho":  SetExport("AHO", "-AHO_Molden_File", ("aho2nao",), True, True),
+    "lpo":  SetExport("LPO", "-LPO_Molden_File", ("lpo2aho", "aho2nao"),
+                      True, True),
+    "nao":  SetExport("NAO", "-NAO_Molden_File", (), True, True),
+    "pnao": SetExport("PNAO", "-PNAO_Molden_File", None, False, False),
 }
 
 
@@ -1064,14 +1069,17 @@ def _load_pair_inputs(target: Path, pure: Path, s_path: Path, f_path: Path):
 
 
 def fock_orbital_energies(target: Path, pure: Path, s_path: Path,
-                          f_path: Path) -> tuple[list[float], str]:
+                          f_path: Path,
+                          require_ortho: bool = True) -> tuple[list[float], str]:
     """E_i = <phi_i|F|phi_i> for every MO block of ``target``, fully gated.
 
     S and F come from JANPA's ``-doFock`` dumps (spherical AO basis, [GTO]
-    function order).  Gates: orthonormality of both orbital sets under S,
-    the canonical residual F C = S C diag(eps) on the .PURE MOs, and an
-    independent cross-check of E via the canonical-MO expansion weights.
-    Raises instead of returning untrustworthy numbers.
+    function order).  Gates: orthonormality of both orbital sets under S
+    (the target's is skipped when ``require_ortho`` is False -- PNAO is
+    normalized but not mutually orthogonal by construction), the canonical
+    residual F C = S C diag(eps) on the .PURE MOs, and an independent
+    cross-check of E via the canonical-MO expansion weights.  Raises
+    instead of returning untrustworthy numbers.
     """
     S, F, eps, Cm, Ct, _, _ = _load_pair_inputs(target, pure, s_path, f_path)
     n = len(S)
@@ -1079,7 +1087,7 @@ def fock_orbital_energies(target: Path, pure: Path, s_path: Path,
     SCm = _matmul(S, Cm)
     SCt = _matmul(S, Ct)
     ortho_mo = _max_dev_from_identity(_matmul(list(zip(*Cm)), SCm))
-    ortho_clpo = _max_dev_from_identity(_matmul(list(zip(*Ct)), SCt))
+    ortho_tgt = _max_dev_from_identity(_matmul(list(zip(*Ct)), SCt))
     FCm = _matmul(F, Cm)
     resid = 0.0
     scale = 0.0
@@ -1098,11 +1106,19 @@ def fock_orbital_energies(target: Path, pure: Path, s_path: Path,
         e2 = sum(U[k][i] * U[k][i] * eps[k] for k in range(n))
         worst_de = max(worst_de, abs(e2 - energies[i]))
 
-    report = (f"gates: CLPO orthonormality {ortho_clpo:.2e} | "
+    se = _set_from_stem(target.stem)
+    tag = se.tag if se else "target"
+    if require_ortho:
+        oth = f"{tag} orthonormality {ortho_tgt:.2e}"
+    else:
+        oth = (f"{tag} non-orthogonality {ortho_tgt:.2e} (expected; "
+               "normalized but mutually non-orthogonal, not gated)")
+    report = (f"gates: {oth} | "
               f"MO orthonormality {ortho_mo:.2e} | "
               f"F C - S C eps {resid:.2e} (scale {scale:.2f}) | "
               f"E cross-check {worst_de:.2e} Ha")
-    if (ortho_clpo > SORT_ORTHO_TOL or ortho_mo > SORT_ORTHO_TOL
+    if ((require_ortho and ortho_tgt > SORT_ORTHO_TOL)
+            or ortho_mo > SORT_ORTHO_TOL
             or resid > SORT_FOCK_TOL * max(scale, 1.0)
             or worst_de > SORT_DE_TOL):
         raise RuntimeError("sort-by-energy validation FAILED: " + report)
@@ -1121,6 +1137,8 @@ def plan_orbital_order(molden_path: Path, pure: Path | None = None,
     """
     base = derive_base(molden_path.stem)
     d = molden_path.parent
+    se = _set_from_stem(molden_path.stem)
+    require_ortho = se is None or se.orthonormal
     tgt = molden_mo_vectors(molden_path)
     nblk = len(tgt)
     occs = [t[1] for t in tgt]
@@ -1160,7 +1178,7 @@ def plan_orbital_order(molden_path: Path, pure: Path | None = None,
 
     if not missing:
         energies, gates = fock_orbital_energies(molden_path, pure, s_matrix,
-                                                fock_ao)
+                                                fock_ao, require_ortho)
         order = sorted(range(nblk),
                        key=lambda i: (occs[i] <= 1.0, energies[i]))
         enes = [energies[i] for i in order]
@@ -1168,6 +1186,13 @@ def plan_orbital_order(molden_path: Path, pure: Path | None = None,
         lines = [f"sort  : energy (<phi|F|phi>; {s_matrix.name}, "
                  f"{fock_ao.name}, {pure.name})",
                  f"        {gates}"]
+        if not require_ortho:
+            lines.append(
+                f"        note: pre-orthogonalization set -- orbitals are "
+                f"normalized but mutually non-orthogonal, and Occup sums "
+                f"to {sum(occs):.3f} e, not the electron count; energies "
+                f"are single-orbital expectation values, pair analysis is "
+                f"not defined for it")
     elif label_ok:
         order = sorted(range(nblk),
                        key=lambda i: _CLASS_RANK.get(labels[i + 1], 3))
@@ -1275,12 +1300,13 @@ def pair_interaction_analysis(
     base = derive_base(target.stem)
     d = target.parent
     se = _SET_EXPORTS.get(set_key) if set_key else _set_from_stem(target.stem)
-    if se is not None and not se.sortable:
+    if se is not None and not se.pair:
         raise RuntimeError(
-            f"{se.tag} is a pre-orthogonalization intermediate set: it is "
-            "not orthonormal and its occupancies do not sum to the electron "
-            "count, so the pair-interaction analysis (E2, q) is not defined "
-            "for it."
+            f"{se.tag} is a pre-orthogonalization intermediate set: its "
+            "orbitals are normalized but not mutually orthogonal, and its "
+            "occupancies do not sum to the electron count, so the "
+            "pair-interaction analysis (E2, q) is not defined for it (the "
+            "viewer file and its energy sort are unaffected)."
         )
     pure = pure or d / f"{base}.PURE"
     s_matrix = s_matrix or d / f"{base}.S.txt"
@@ -1791,43 +1817,26 @@ def main(argv: list[str] | None = None) -> None:
             spin = args.spin or resolve_spin_label(substrate,
                                                    workdir / f"{base}.PURE")
             print("      " + fix_spherical_markers(substrate, substrate, spin))
-            if se.sortable:
-                # Viewer file: cartesian, real Fock energies, occupied-first;
-                # --avogadro adds the integer-Occup workaround for Avogadro's
-                # electron-count bug (kept behind the flag until upstream
-                # fixes it).
-                sort = plan_orbital_order(substrate, args.pure, args.s_matrix,
-                                          args.fock_ao)
-                print(sort.report)
-            else:
-                # Pre-orthogonalization intermediate (PNAO): not orthonormal,
-                # so no energy ordering and no pair analysis; report the
-                # measured facts instead of pretending.
-                sort = None
-                _S, _F, _eps, _Cm, Ct, _om, occ = _load_pair_inputs(
-                    substrate,
-                    args.pure or workdir / f"{base}.PURE",
-                    args.s_matrix or workdir / f"{base}.S.txt",
-                    args.fock_ao or workdir / f"{base}.fock_ao.txt")
-                orth = _max_dev_from_identity(
-                    _matmul(list(zip(*Ct)), _matmul(_S, Ct)))
-                print(f"sort  : none ({se.tag} is a pre-orthogonalization "
-                      f"intermediate: not orthonormal, max|C^T S C - I| "
-                      f"{orth:.1e}, sum(Occup) {sum(occ):.3f} e -- energy "
-                      f"ordering and pair analysis are not defined; JANPA "
-                      f"order kept)")
+            # Viewer file: cartesian, real Fock energies, occupied-first;
+            # --avogadro adds the integer-Occup workaround for Avogadro's
+            # electron-count bug (kept behind the flag until upstream fixes
+            # it).  PNAO sorts like every other set: its orbitals are
+            # normalized, so E = <phi|F|phi> is well-defined -- the sort
+            # report states the non-orthogonality and the relaxed gate.
+            sort = plan_orbital_order(substrate, args.pure, args.s_matrix,
+                                      args.fock_ao)
+            print(sort.report)
             print("      " + convert_to_cart(
                 substrate, viewer,
                 spin or ("Alpha" if args.avogadro else None),
                 args.avogadro, sort))
-            print(f"Viewer file  : {viewer.name}  (cartesian"
-                  + (", real energies, occupied-first" if se.sortable
-                     else ", JANPA order")
+            print(f"Viewer file  : {viewer.name}  (cartesian, real energies, "
+                  "occupied-first"
                   + (", integer Occup" if args.avogadro else "") + ")")
             print(f"Substrate    : {substrate.name}  (spherical -- analysis "
                   "input)")
             if e2_inline:
-                if se.sortable:
+                if se.pair:
                     _emit_e2(substrate, args.pure, args.s_matrix,
                              args.fock_ao,
                              workdir / f"{base}_{se.tag}_E2.txt", set_key=k)
@@ -1838,7 +1847,7 @@ def main(argv: list[str] | None = None) -> None:
               f"{base}.fock_nao.txt"
               + "".join(f", {base}.{c}.txt" for c in chain_keys))
         _first = next((_SET_EXPORTS[k] for k in sets
-                       if _SET_EXPORTS[k].sortable), None)
+                       if _SET_EXPORTS[k].pair), None)
         if _first is not None:
             print(f"Next         : python {Path(sys.argv[0]).name} --e2 "
                   f"{base}_{_first.tag}_spherical.molden")
