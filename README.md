@@ -4,6 +4,8 @@
 
 **Localized orbitals out of ORCA that actually open.**
 
+One stdlib-only script: `orca_to_janpa.py`.
+
 `.gbw` → Molden → JANPA → Molden files your viewer can trust:
 real energies, clean labels, the right electron count.
 
@@ -12,7 +14,7 @@ real energies, clean labels, the right electron count.
 ![output: Molden](https://img.shields.io/badge/output-Molden-e36209?style=flat-square)
 [![tested with ORCA 6.1.1](https://img.shields.io/badge/tested_with-ORCA_6.1.1-0b5f8a?style=flat-square)](https://www.faccts.de/orca/)
 [![tested with JANPA 2.02](https://img.shields.io/badge/tested_with-JANPA_2.02-6f42c1?style=flat-square)](http://janpa.sourceforge.net/)
-[![validated vs NBO 3.1](https://img.shields.io/badge/validated_vs-NBO_3.1-brightgreen?style=flat-square)](VALIDATION.md)
+[![NPA + Wiberg validated vs NBO 3.1](https://img.shields.io/badge/NPA_%2B_Wiberg_validated_vs-NBO_3.1-brightgreen?style=flat-square)](VALIDATION.md)
 [![no .47 file needed](https://img.shields.io/badge/.47_file-not_needed-blueviolet?style=flat-square)](#quick-start)
 [![license: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](LICENSE)
 
@@ -100,9 +102,12 @@ passed straight to `janpa.jar`:
 python orca_to_janpa.py molecule -- --npacharges charges.txt
 ```
 
-Defaults expect ORCA at `C:/ORCA_6.1.1` and the JANPA jars in one folder;
-`--orca-dir` / `--janpa-dir` point elsewhere. Checking an ORCA output by
-hand: `python orca_to_janpa.py --diagnose molecule.out`.
+Point the tool at your installs once: `--orca-dir` (default
+`C:/ORCA_6.1.1`, with a `PATH` fallback for `orca_2mkl`) and `--janpa-dir`
+(the folder holding `janpa.jar` and `molden2molden.jar` — **not** searched
+on `PATH`; default: the current directory) — or set the `ORCA_DIR` /
+`JANPA_DIR` environment variables. Checking an ORCA output by hand:
+`python orca_to_janpa.py --diagnose molecule.out`.
 
 ## Verified
 
@@ -148,12 +153,14 @@ Every set flag writes exactly two Molden files for its set:
 - `<base>_<SET>.molden` — **the viewer file**: cartesian d/f, markers
   clean, `Spin=` corrected from the canonical source, real Fock energies,
   occupied-first order (see "Orbital order and energies"). One file per
-  set, one name each, works in every Molden reader. With `--avogadro` the
-  very same file instead gets integer `Occup= 2/0`, because Avogadro
-  parses `Occup` as int (1.986 → 1, miscounting 16 electrons as 8) and
-  fills orbitals positionally, so fractional occupations mislabel
-  occupied/virtual ([upstream issue #3005](https://github.com/OpenChemistry/avogadrolibs/issues/3005)).
-  Same filename either way — drop the flag when the upstream bug is fixed.
+  set, one name each, works in every Molden reader. **Avogadro users:
+  always pass `--avogadro`** — the automatic fixes are markers + cartesian;
+  the occupancy workaround is opt-in. It keeps the same filename but writes
+  integer `Occup= 2/0`, because Avogadro parses `Occup` as int (1.986 → 1,
+  miscounting 16 electrons as 8) and fills orbitals positionally, so
+  fractional occupations mislabel occupied/virtual
+  ([upstream issue #3005](https://github.com/OpenChemistry/avogadrolibs/issues/3005)).
+  Drop the flag when the upstream bug is fixed.
 - `<base>_<SET>_spherical.molden` — the **analysis substrate**: JANPA's
   export with only the two corrected labels (markers, `Spin=`); JANPA's
   order, sequential `Ene=` values and fractional `Occup` stay exactly as
@@ -271,10 +278,14 @@ table only describes the CLPO set, so the printed-pair cross-check and
 the labels apply there; other sets verify through the route-B chain and
 report "labels/CT check skipped".
 
-Numbers from the examples folder (wB97X-D3/def2-TZVP): isobutene
-sigma(C-H) -> pi*(C=C) ~5 kcal/mol per methyl C-H; formaldehyde O lone
-pair -> sigma*(C-H) ~29 kcal/mol; tert-butyl cation sigma(C-H) -> empty-p
-~34 kcal/mol x3; water (HF) tops out at ~2 kcal/mol.
+Numbers from the examples folder (wB97X-D3/def2-TZVP, so E2 is
+**indicative** there — prefer `q`): isobutene sigma(C-H) -> pi*(C=C) ~5
+kcal/mol per methyl C-H (q = 0.015 e); formaldehyde O lone pair ->
+sigma*(C-H) ~29 kcal/mol (q = 0.059 e; this is the one channel where
+CLPO and NBO genuinely diverge -- see [VALIDATION.md](VALIDATION.md));
+tert-butyl cation sigma(C-H) -> empty-p ~34 kcal/mol x3 (q = 0.084 e);
+water (HF, where E2 is directly meaningful) tops out at ~2 kcal/mol
+(q = 0.0012 e).
 
 ### Which JANPA orbital set (all work with the viewer/analysis modes)
 
@@ -307,6 +318,18 @@ for the matrices (`-Fock_AO_File`, `-Fock_NAO_File`, `-S_Matrix_File` plus
 the transformation chain of whichever set: `-CLPO2LHO_File`,
 `-LHO2NAO_File`, `-AHO2NAO_File`, `-LPO2AHO_File`; `-doFock` is a bare
 flag).
+
+## Limits
+
+- **Closed-shell molecules, in practice.** The occupied/virtual split is an
+  occupancy cut (Occup > 1.0), `--avogadro` writes integer `Occup= 2/0`,
+  and `Spin=` is retagged from one uniform label — all closed-shell
+  assumptions; open-shell references are out of scope.
+- **No g shells.** `--to-cart` stops with that message (instead of a
+  traceback) and the spherical file from `--fix-markers` is the artifact
+  for such molecules.
+- PNAO gets the viewer treatment but no pair analysis (see "Viewing
+  orbitals").
 
 ## Project rules
 
