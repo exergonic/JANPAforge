@@ -1,0 +1,13 @@
+%Mem=1000MB
+%Chk=formaldehyde.chk
+#p hf/cc-pvdz pop=nboread
+
+formaldehyde HF/cc-pVDZ single point (archive geometry)
+
+0 1
+C   0.58145514  0.00000001  0.00073323
+O  -0.61440039 -0.00000004 -0.00028141
+H   1.16707266  0.93929613  0.00122409
+H   1.16707259 -0.93929610  0.00122409
+
+$NBO BNDIDX $END

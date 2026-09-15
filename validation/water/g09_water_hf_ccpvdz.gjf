@@ -1,0 +1,13 @@
+%Mem=1000MB
+%Chk=water_ccpvdz.chk
+#p hf/cc-pvdz pop=nboread
+
+water HF/cc-pVDZ SP
+
+0 1
+O   0.00000000  0.00000000  0.06260000
+H  -0.79200000  0.00000000 -0.49730000
+H   0.79200000  0.00000000 -0.49730000
+
+$NBO BNDIDX $END
+
