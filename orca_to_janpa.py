@@ -19,14 +19,15 @@ JANPA wiki (ORCA 3.0.x era) no longer produces a ``.47`` file --
 ORCA just logs ``Now starting NBO....`` + the dummy output and moves
 on.  See ``diagnose_nbo_output()`` and README.md.
 
-Viewer workflow: the pipeline ``--clpo`` flag writes the spherical
-substrate (``<base>_CLPO_spherical.molden``: JANPA's export with corrected
-markers and spin, kept as the analysis input) and the viewer file
-(``<base>_CLPO.molden``: cartesian, real Fock energies, occupied-first
-order; integer Occup with ``--avogadro`` until the upstream Avogadro
-occupancy bug is fixed).  The standalone ``--to-cart`` / ``--fix-markers``
-/ ``--sort-energy`` / ``--e2`` modes re-process existing files.  See
-README.md.
+Viewer workflow: one pipeline flag per JANPA orbital set (``--clpo``,
+``--lho``, ``--aho``, ``--lpo``, ``--nao``, ``--pnao``, or ``--all-sets``)
+writes the spherical substrate (``<base>_<SET>_spherical.molden``: JANPA's
+export with corrected markers and spin, kept as the analysis input) and
+the viewer file (``<base>_<SET>.molden``: cartesian, real Fock energies,
+occupied-first order; integer Occup with ``--avogadro`` until the upstream
+Avogadro occupancy bug is fixed).  The standalone ``--to-cart`` /
+``--fix-markers`` / ``--sort-energy`` / ``--e2`` modes re-process existing
+files.  See README.md.
 """
 
 from __future__ import annotations
@@ -283,11 +284,6 @@ def diagnose_nbo_output(out_path: Path) -> str:
 # instead of writing a bad file.
 # ---------------------------------------------------------------------------
 
-# Molden component orders (match MOrbVis's evaluator + Molden manual).
-CART_D_ORDER = ("xx", "yy", "zz", "xy", "xz", "yz")
-CART_F_ORDER = ("xxx", "yyy", "zzz", "xyy", "xxy", "xxz",
-                "xzz", "yzz", "yyz", "xyz")
-
 SPHER_N = {"s": 1, "p": 3, "d": 5, "f": 7, "g": 9}
 CART_N = {"s": 1, "p": 3, "d": 6, "f": 10, "g": 15}
 
@@ -411,7 +407,8 @@ def spher_f_to_cart(c: list[float]) -> list[float]:
 
 def _check_block(L: str, c_spher: list[float],
                  C_cart: list[float]) -> tuple[float, float]:
-    """Projection error max|T.C - c| and overlap-norm drift |C'SC - c'c|."""
+    """Projection error max|T.C - c| and relative norm drift
+    |C'SC - c'c| / c'c."""
     _, T, S = _MAPS[L]
     back = [sum(T[r][k] * C_cart[k] for k in range(len(C_cart)))
             for r in range(len(c_spher))]
@@ -460,8 +457,8 @@ def convert_to_cart(in_path: Path, out_path: Path,
     With avogadro=True, MOs are reordered occupied-first and Occup is
     rewritten as integers (2/0, threshold occ>1.0): Avogadro parses
     Occup as int (1.986 -> 1, undercounting electrons 16 -> 8) and
-    fills orbitals positionally by energy order, so fractional
-    occupations with all-zero energies mislabel virtuals as occupied.
+    fills orbitals positionally, so fractional occupations mislabel
+    the occupied/virtual sets.
 
     With ``sort`` (a SortPlan from ``plan_orbital_order``) the MO blocks
     are written in the plan's order and each ``Ene=`` is replaced by the
@@ -471,91 +468,40 @@ def convert_to_cart(in_path: Path, out_path: Path,
     shell_ls = molden_shell_ls(in_path)
     if "g" in shell_ls:
         raise NotImplementedError("g shells not implemented for --to-cart")
-    lines = in_path.read_text(encoding="utf-8", errors="replace").splitlines()
-    out: list[str] = []
+    expect = sum(SPHER_N[L] for L in shell_ls)
+    before, blocks, after = split_molden_mo_section(in_path)
     worst_dc = 0.0
     worst_dn = 0.0
     mo_blocks: list[tuple[list[str], list[float], float]] = []
-    cur_header: list[str] = []
-    cur_coeffs: list[float] = []
-    in_mo = False
-
-    def flush_mo() -> None:
-        nonlocal worst_dc, worst_dn
-        if not cur_header and not cur_coeffs:
-            return
-        expect = sum(SPHER_N[L] for L in shell_ls)
-        if len(cur_coeffs) != expect:
+    for header, coeff_lines in blocks:
+        coeffs = [float(l.split()[1]) for l in coeff_lines]
+        if len(coeffs) != expect:
             raise ValueError(
-                f"MO #{len(mo_blocks) + 1}: {len(cur_coeffs)} coeffs but "
+                f"MO #{len(mo_blocks) + 1}: {len(coeffs)} coeffs but "
                 f"basis has {expect} spherical functions -- wrong file?")
         cart: list[float] = []
         pos = 0
         for L in shell_ls:
             n = SPHER_N[L]
-            c = cur_coeffs[pos:pos + n]
+            c = coeffs[pos:pos + n]
             pos += n
             if L in ("s", "p"):
                 cart.extend(c)
-            elif L == "d":
-                cc = spher_d_to_cart(c)
-                cart.extend(cc)
-                dc, dn = _check_block("d", c, cc)
-                worst_dc = max(worst_dc, dc)
-                worst_dn = max(worst_dn, dn)
-            elif L == "f":
-                cc = spher_f_to_cart(c)
-                cart.extend(cc)
-                dc, dn = _check_block("f", c, cc)
-                worst_dc = max(worst_dc, dc)
-                worst_dn = max(worst_dn, dn)
+                continue
+            cc = spher_d_to_cart(c) if L == "d" else spher_f_to_cart(c)
+            cart.extend(cc)
+            dc, dn = _check_block(L, c, cc)
+            worst_dc = max(worst_dc, dc)
+            worst_dn = max(worst_dn, dn)
         occup = 0.0
-        for h in cur_header:
-            if h.strip().startswith("Occup="):
+        for h in header:
+            hs = h.strip()
+            if hs.startswith("Occup="):
                 try:
-                    occup = float(h.split("=", 1)[1])
+                    occup = float(hs.split("=", 1)[1])
                 except ValueError:
                     pass
-        mo_blocks.append((list(cur_header), cart, occup))
-        cur_header.clear()
-        cur_coeffs.clear()
-
-    for raw in lines:
-        line = raw.strip()
-        if line.startswith("[MO]"):
-            in_mo = True
-            out.append(raw)
-            continue
-        if in_mo and line.startswith("["):
-            flush_mo()
-            in_mo = False
-            out.append(raw)
-            continue
-        if _is_marker(line):
-            continue  # drop spherical markers in cartesian output
-        if in_mo:
-            if line.startswith("Sym="):
-                flush_mo()
-                cur_header.append(raw)
-            elif line.startswith(("Ene=", "Occup=")):
-                cur_header.append(raw)
-            elif line.startswith("Spin="):
-                cur_header.append(
-                    f"Spin= {spin}" if spin else raw)
-            elif line == "":
-                continue
-            else:
-                parts = line.split()
-                if len(parts) >= 2:
-                    try:
-                        cur_coeffs.append(float(parts[1]))
-                        continue
-                    except ValueError:
-                        pass
-                cur_header.append(raw)
-        else:
-            out.append(raw)
-    flush_mo()
+        mo_blocks.append((list(header), cart, occup))
 
     if sort is not None:
         if len(sort.perm) != len(mo_blocks):
@@ -570,6 +516,8 @@ def convert_to_cart(in_path: Path, out_path: Path,
     else:
         ordered = mo_blocks
     n_mo = len(ordered)
+    out: list[str] = list(before)
+    out.append("[MO]")
     for pos, (header, coeffs, occup) in enumerate(ordered):
         is_occ = avogadro and occup > 1.0
         for h in header:
@@ -578,10 +526,13 @@ def convert_to_cart(in_path: Path, out_path: Path,
                 out.append(f" Ene= {sort.enes[pos]:.14E}")
             elif hs.startswith("Occup=") and avogadro:
                 out.append(f" Occup= {2 if is_occ else 0}")
+            elif hs.startswith("Spin="):
+                out.append(f"Spin= {spin}" if spin else h)
             else:
                 out.append(h)
         for i, v in enumerate(coeffs, 1):
             out.append(f"  {i:<6d}{v: .12f}".rstrip())
+    out.extend(after)
 
     report = (f"{n_mo} MOs -> "
               f"{sum(CART_N[L] for L in shell_ls)} cartesian functions; "
@@ -733,8 +684,9 @@ def fix_spherical_markers(in_path: Path, out_path: Path,
 #     come from a run on the canonical ``<base>.PURE``; the dumps are gated
 #     against that file (F C = S C diag(eps) on the canonical MOs) and
 #     against the export (orthonormality under S), and E is cross-checked
-#     against sum_k |<CLPO_i|MO_k>|^2 eps_k -- all before anything is
-#     written.  The pipeline ``--clpo`` flag produces every input.
+#     against sum_k |<phi_i|MO_k>|^2 eps_k -- all before anything is
+#     written.  The pipeline set flags (e.g. ``--clpo``) produce every
+#     input.
 #
 #   class route -- needs only the janpa stdout saved as ``<base>.JANPA``:
 #     its CLPO summary labels every orbital (BD)/(NB)/(LP)/(RY).  Order =
@@ -822,7 +774,6 @@ def requested_sets(args) -> list[str]:
 class SortPlan(NamedTuple):
     """Output order for one molden orbital set (see plan_orbital_order)."""
 
-    mode: str            # "energy" or "class"
     perm: list[int]      # perm[i] = input MO block index -> output slot i
     enes: list[float]    # Ene= value per output slot (Ha, or sequential)
     report: str          # human-readable audit trail
@@ -894,48 +845,24 @@ def read_matrix_dump(path: Path) -> list[list[float]]:
 
 def molden_mo_vectors(path: Path) -> list[tuple[float, float, list[float]]]:
     """(Ene, Occup, coefficients) per MO block, in file order."""
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    blocks: list[tuple[float, float, list[float]]] = []
-    ene = 0.0
-    occ = 0.0
-    coeffs: list[float] = []
-    in_mo = False
-
-    def flush() -> None:
-        nonlocal ene, occ
-        if coeffs:
-            blocks.append((ene, occ, list(coeffs)))
-            coeffs.clear()
-        ene = occ = 0.0
-
-    for raw in lines:
-        line = raw.strip()
-        if not in_mo:
-            if line.startswith("[MO]"):
-                in_mo = True
+    _before, blocks, _after = split_molden_mo_section(path)
+    out: list[tuple[float, float, list[float]]] = []
+    for header, coeff_lines in blocks:
+        if not coeff_lines:
             continue
-        if line.startswith("[") or line.startswith("Sym="):
-            flush()
-            if line.startswith("["):
-                in_mo = False
-            continue
-        if line.startswith("Ene="):
-            ene = float(line.split("=", 1)[1])
-        elif line.startswith("Occup="):
-            occ = float(line.split("=", 1)[1])
-        elif line.startswith("Spin=") or line == "":
-            continue
-        else:
-            parts = line.split()
-            if len(parts) >= 2:
-                try:
-                    coeffs.append(float(parts[1]))
-                except ValueError:
-                    pass
-    flush()
-    if not blocks:
+        coeffs = [float(l.split()[1]) for l in coeff_lines]
+        ene = 0.0
+        occ = 0.0
+        for h in header:
+            hs = h.strip()
+            if hs.startswith("Ene="):
+                ene = float(hs.split("=", 1)[1])
+            elif hs.startswith("Occup="):
+                occ = float(hs.split("=", 1)[1])
+        out.append((ene, occ, coeffs))
+    if not out:
         raise RuntimeError(f"{path}: no [MO] blocks found")
-    return blocks
+    return out
 
 
 def clpo_summary_from_log(log_path: Path) -> dict:
@@ -994,32 +921,26 @@ def clpo_classes_from_log(log_path: Path):
     return labels, occs
 
 
-def clpo_ct_pairs_from_log(log_path: Path):
-    """Read JANPA's own charge-transfer table for cross-checking.
+def clpo_ct_pairs_from_log(log_path: Path) -> list[tuple[int, float, int]]:
+    """JANPA's own charge-transfer table, for cross-checking ``--e2``.
 
-    Returns ([(donor_index, charge, acceptor_index)], (n_below, total_e))
-    -- empty list when the CT section is absent.
+    Returns [(donor_index, charge, acceptor_index), ...], empty when the
+    CT section is absent.
     """
     text = log_path.read_text(encoding="utf-8", errors="replace")
     if "Approximate charge transfer" not in text:
-        return [], None
+        return []
     sec = text.split("Approximate charge transfer", 1)[1]
     sec = sec.split("IntErfragment", 1)[0]
     pat = re.compile(r"^\s*(\d+)\s+.+?\s+[\d.-]+\s+-->\s+([\d.]+)\s+-->"
                      r"\s+[\d.]+\s+.+?\s+(\d+)\s*$")
     pairs = []
-    total = None
     for line in sec.splitlines():
         mt = pat.match(line)
         if mt:
             pairs.append((int(mt.group(1)), float(mt.group(2)),
                           int(mt.group(3))))
-            continue
-        ms = re.search(r"(\d+) orbital pairs with total charge transfer of"
-                       r"\s+([\d.]+)", line)
-        if ms:
-            total = (int(ms.group(1)), float(ms.group(2)))
-    return pairs, total
+    return pairs
 
 
 def _matmul(A: list[list[float]], B: list[list[float]]) -> list[list[float]]:
@@ -1068,6 +989,30 @@ def _load_pair_inputs(target: Path, pure: Path, s_path: Path, f_path: Path):
     return S, F, eps, Cm, Ct, occ_mo, occ_tgt
 
 
+def _fock_gates(S, F, eps, Cm, Ct):
+    """Orthonormality + canonical-residual numbers, shared by the analyses.
+
+    Gates both orbital sets under S and the canonical residual
+    F C = S C diag(eps) -- the dumps must describe the .PURE.  Returns
+    (S*Ct, max|Cm'SCm - I|, max|Ct'SCt - I|, max|F C - S C eps|,
+    max|F C|); each caller applies its own tolerances so its error text
+    can name the analysis.
+    """
+    n = len(S)
+    SCm = _matmul(S, Cm)
+    SCt = _matmul(S, Ct)
+    ortho_mo = _max_dev_from_identity(_matmul(list(zip(*Cm)), SCm))
+    ortho_tgt = _max_dev_from_identity(_matmul(list(zip(*Ct)), SCt))
+    FCm = _matmul(F, Cm)
+    resid = 0.0
+    scale = 0.0
+    for a in range(n):
+        for k in range(n):
+            resid = max(resid, abs(FCm[a][k] - SCm[a][k] * eps[k]))
+            scale = max(scale, abs(FCm[a][k]))
+    return SCt, ortho_mo, ortho_tgt, resid, scale
+
+
 def fock_orbital_energies(target: Path, pure: Path, s_path: Path,
                           f_path: Path,
                           require_ortho: bool = True) -> tuple[list[float], str]:
@@ -1084,19 +1029,8 @@ def fock_orbital_energies(target: Path, pure: Path, s_path: Path,
     S, F, eps, Cm, Ct, _, _ = _load_pair_inputs(target, pure, s_path, f_path)
     n = len(S)
 
-    SCm = _matmul(S, Cm)
-    SCt = _matmul(S, Ct)
-    ortho_mo = _max_dev_from_identity(_matmul(list(zip(*Cm)), SCm))
-    ortho_tgt = _max_dev_from_identity(_matmul(list(zip(*Ct)), SCt))
-    FCm = _matmul(F, Cm)
-    resid = 0.0
-    scale = 0.0
-    for a in range(n):
-        for k in range(n):
-            resid = max(resid, abs(FCm[a][k] - SCm[a][k] * eps[k]))
-            scale = max(scale, abs(FCm[a][k]))
-    F_ct = _matmul(F, Ct)
-    M = _matmul(list(zip(*Ct)), F_ct)          # F in the target basis
+    SCt, ortho_mo, ortho_tgt, resid, scale = _fock_gates(S, F, eps, Cm, Ct)
+    M = _matmul(list(zip(*Ct)), _matmul(F, Ct))  # F in the target basis
     energies = [M[i][i] for i in range(n)]
 
     # Independent cross-check: E_i = sum_k |<phi_i|MO_k>|^2 eps_k.
@@ -1247,7 +1181,7 @@ def plan_orbital_order(molden_path: Path, pure: Path | None = None,
                 lines.append(f"          ... ({n_occ - 12} more)")
         lines.append(f"        E range: {min(enes):+.6f} .. "
                      f"{max(enes):+.6f} Ha")
-    return SortPlan(mode, order, enes, "\n".join(lines))
+    return SortPlan(order, enes, "\n".join(lines))
 
 
 # ---------------------------------------------------------------------------
@@ -1287,7 +1221,6 @@ def pair_interaction_analysis(
         pure: Path | None = None,
         s_matrix: Path | None = None,
         fock_ao: Path | None = None,
-        nao: Path | None = None,
         set_key: str | None = None,
 ) -> tuple[list[str], list[str], str]:
     """E(2)-like + charge-transfer pair table for a JANPA orbital export.
@@ -1321,17 +1254,7 @@ def pair_interaction_analysis(
     S, F, eps, Cm, Ct, occ_mo, occ_tgt = _load_pair_inputs(
         target, pure, s_matrix, fock_ao)
     n = len(S)
-    SCm = _matmul(S, Cm)
-    SCt = _matmul(S, Ct)
-    ortho_t = _max_dev_from_identity(_matmul(list(zip(*Ct)), SCt))
-    ortho_m = _max_dev_from_identity(_matmul(list(zip(*Cm)), SCm))
-    FCm = _matmul(F, Cm)
-    resid = 0.0
-    scale = 0.0
-    for a in range(n):
-        for k in range(n):
-            resid = max(resid, abs(FCm[a][k] - SCm[a][k] * eps[k]))
-            scale = max(scale, abs(FCm[a][k]))
+    SCt, ortho_mo, ortho_tgt, resid, scale = _fock_gates(S, F, eps, Cm, Ct)
     F_loc = _matmul(list(zip(*Ct)), _matmul(F, Ct))
     U = _matmul(list(zip(*Cm)), SCt)      # [canonical k][target i]
 
@@ -1351,10 +1274,10 @@ def pair_interaction_analysis(
             for j in range(n):
                 row[j] += f * uk[j]
 
-    checks = (f"gates  : {target.name} orthonormality {ortho_t:.2e} | "
-              f"{pure.name} orthonormality {ortho_m:.2e} | "
+    checks = (f"gates  : {target.name} orthonormality {ortho_tgt:.2e} | "
+              f"{pure.name} orthonormality {ortho_mo:.2e} | "
               f"F C - S C eps {resid:.2e} (scale {scale:.2f})")
-    if (ortho_t > SORT_ORTHO_TOL or ortho_m > SORT_ORTHO_TOL
+    if (ortho_tgt > SORT_ORTHO_TOL or ortho_mo > SORT_ORTHO_TOL
             or resid > SORT_FOCK_TOL * max(scale, 1.0)):
         raise RuntimeError("pair analysis validation FAILED: " + checks)
 
@@ -1363,7 +1286,7 @@ def pair_interaction_analysis(
     # (CLPO/LHO/AHO/LPO) is checked for orthonormality on the way; for NAO
     # the F_NAO dump itself is the independent side; PNAO has no NAO-space
     # path and skips the check with a note.
-    nao = nao or d / f"{base}.fock_nao.txt"
+    nao = d / f"{base}.fock_nao.txt"
     if se is None or se.chain is None:
         checks += (" | route B skipped (no NAO-space transformation chain "
                    "for this set)")
@@ -1421,7 +1344,7 @@ def pair_interaction_analysis(
                            f"({worst_lab:.1e}) -- labels/CT check skipped")
             else:
                 labels = {i: v[1] for i, v in summary.items()}
-                pairs, _total = clpo_ct_pairs_from_log(log_path)
+                pairs = clpo_ct_pairs_from_log(log_path)
                 if pairs:
                     worst_ct = max(abs(Dm[i - 1][j - 1] ** 2
                                        / Dm[i - 1][i - 1] - q)
@@ -1458,8 +1381,10 @@ def pair_interaction_analysis(
             rows.append((e2, q, i, j, F_loc[i][j], de, strong))
     rows.sort(key=lambda r: (r[0] is None, -(r[0] or 0.0)))
 
+    fallback = se.tag if se else "MO"
+
     def name(idx: int) -> str:
-        return labels[idx + 1] if labels else f"CLPO {idx + 1}"
+        return labels[idx + 1] if labels else f"{fallback} {idx + 1}"
 
     table_rows = []
     for k, (e2, q, i, j, fij, de, strong) in enumerate(rows, 1):
@@ -1619,7 +1544,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="MOLDEN",
         help="Rewrite [5D]/[7F]/[9G] markers from the actual shells and "
         "default-fix the spin label (this is also the substrate sanitizer "
-        "used by --clpo)",
+        "used by the set flags)",
     )
     ap.add_argument(
         "--markers-out",
@@ -1637,10 +1562,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--sort-energy",
         action="store_true",
-        help="Standalone --to-cart/--fix-markers modifier (--clpo applies "
-        "this by default): write the MOs occupied-first then in ascending "
-        "Fock energy E=<phi|F|phi> (reads the <base>.S.txt / "
-        "<base>.fock_ao.txt dumps and <base>.PURE from a '--clpo' run); "
+        help="Standalone --to-cart/--fix-markers modifier (the set flags "
+        "apply this by default): write the MOs occupied-first then in "
+        "ascending Fock energy E=<phi|F|phi> (reads the <base>.S.txt / "
+        "<base>.fock_ao.txt dumps and <base>.PURE from a set-flag run); "
         "falls back to CLPO class order (BD+LP, NB, RY) from <base>.JANPA "
         "when those inputs are missing",
     )
@@ -1675,9 +1600,9 @@ def build_parser() -> argparse.ArgumentParser:
         "export: E2 = n_i F_ij^2/(F_jj-F_ii) in kcal/mol (Fock matrix in "
         "the localized basis) plus the charge transfer q = D_ij^2/D_ii "
         "that JANPA's own CT analysis prints.  Pass the file (usually "
-        "<base>_CLPO_spherical.molden), or use bare --e2 with --clpo to "
-        "analyze the export from this run.  Cross-checks JANPA's printed "
-        "CT values when the log describes the export",
+        "<base>_CLPO_spherical.molden), or use bare --e2 with a set flag "
+        "to analyze the export from this run.  Cross-checks JANPA's "
+        "printed CT values when the log describes the export",
     )
     ap.add_argument(
         "--e2-out",
@@ -1688,7 +1613,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--avogadro",
         action="store_true",
-        help="--to-cart/--clpo modifier: write integer Occup= 2/0 "
+        help="--to-cart/set-flag modifier: write integer Occup= 2/0 "
         "(threshold occ>1.0) instead of the true fractional occupancies. "
         "Avogadro parses Occup as int, so fractional occupations miscount "
         "electrons and mislabel virtuals; this is the workaround until the "
@@ -1771,34 +1696,37 @@ def main(argv: list[str] | None = None) -> None:
 
     out_file = args.janpa_out or (workdir / f"{base}.JANPA")
     print(f"[3/3] janpa -> {out_file.name}")
-    extra = (
+    passthrough = (
         args.janpa_args[1:]
         if args.janpa_args[:1] == ["--"]
         else args.janpa_args
     )
+    janpa_extra = passthrough
     if sets:
         # One Molden export per requested set plus the dumps the analysis
         # modes need: -doFock builds the Fock matrix from the .PURE orbital
         # energies; the Fock_NAO dump and the per-set transformation chains
-        # feed the route-B cross-check of --e2 (verified for CLPO; JANPA
-        # wiki "E2_pert" recipe).  janpa writes every substrate; the viewer
+        # feed the route-B cross-check of --e2 (NAO-space chains for
+        # CLPO/LHO/AHO/LPO, the F_NAO dump directly for NAO; JANPA wiki
+        # "E2_pert" recipe).  janpa writes every substrate; the viewer
         # files are converted from them.
         chain_keys: list[str] = []
         for k in sets:
             for c in (_SET_EXPORTS[k].chain or ()):
                 if c not in chain_keys:
                     chain_keys.append(c)
-        extra = []
+        set_args: list[str] = []
         for k in sets:
             se = _SET_EXPORTS[k]
-            extra += [se.opt, f"{base}_{se.tag}_spherical.molden"]
-        extra += ["-doFock"]
+            set_args += [se.opt, f"{base}_{se.tag}_spherical.molden"]
+        set_args += ["-doFock"]
         for dk in ("fock_ao", "fock_nao", "s", *chain_keys):
             opt, pat = _DUMP_EXPORTS[dk]
-            extra += [opt, pat.format(b=base)]
-        extra += ["-MatrixFloatNumberFormat", "%.9f",
-                  "-RyOccPrintThreshold", "-1"] + extra
-    stdout = run_janpa(workdir, pure, janpa_jar, out_file, extra)
+            set_args += [opt, pat.format(b=base)]
+        set_args += ["-MatrixFloatNumberFormat", "%.9f",
+                     "-RyOccPrintThreshold", "-1"]
+        janpa_extra = set_args + passthrough  # user args last: they win
+    stdout = run_janpa(workdir, pure, janpa_jar, out_file, janpa_extra)
     # Print the electron-count + NPA summary lines as a quick receipt.
     for line in stdout.splitlines():
         if "Total number of electrons" in line or "Sum of electrons" in line:
