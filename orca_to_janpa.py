@@ -836,18 +836,19 @@ def molden_mo_vectors(path: Path) -> list[tuple[float, float, list[float]]]:
     return blocks
 
 
-def clpo_classes_from_log(log_path: Path):
-    """({index: 'BD'|'LP'|'NB'|'RY'}, {index: occupancy}) from janpa stdout.
+def clpo_summary_from_log(log_path: Path) -> dict:
+    """{index: (class, display_label, occupancy)} from the CLPO summary.
 
-    Returns (None, None) when the log has no CLPO summary block.
+    ``class`` is 'BD'/'NB'/'LP'/'RY'/'??' and ``display_label`` looks like
+    'C1-H3:BD' (same style the CT analysis prints).  Empty dict when the
+    log has no CLPO summary block.
     """
     text = log_path.read_text(encoding="utf-8", errors="replace")
     if "*** Summary of CLPO results" not in text:
-        return None, None
+        return {}
     block = text.split("*** Summary of CLPO results", 1)[1]
     block = block.split("Number of two-center", 1)[0]
-    labels: dict[int, str] = {}
-    occs: dict[int, float] = {}
+    out: dict[int, tuple[str, str, float]] = {}
     for line in block.splitlines():
         cells = line.split("\t")
         if len(cells) < 3:
@@ -859,21 +860,64 @@ def clpo_classes_from_log(log_path: Path):
             occ = float(cells[2].strip())
         except ValueError:
             continue
-        idx = int(head[0])
-        desc = cells[1]
+        desc = cells[1].strip()
         if "antibonding" in desc:
-            lab = "NB"
+            atoms, cls = desc.split(",")[0].strip(), "NB"
         elif "(BD)" in desc:
-            lab = "BD"
+            atoms = desc.split("(BD)", 1)[1].split(",")[0].strip()
+            cls = "BD"
         elif "(LP)" in desc:
-            lab = "LP"
+            atoms = desc.split("(LP)", 1)[1].strip()
+            cls = "LP"
         elif "(RY)" in desc:
-            lab = "RY"
+            atoms = desc.replace("(RY)", "").strip()
+            cls = "RY"
         else:
-            lab = "??"
-        labels[idx] = lab
-        occs[idx] = occ
+            atoms, cls = desc, "??"
+        label = f"{atoms}:{cls}" if cls != "??" else atoms
+        out[int(head[0])] = (cls, label, occ)
+    return out
+
+
+def clpo_classes_from_log(log_path: Path):
+    """({index: 'BD'|'LP'|'NB'|'RY'}, {index: occupancy}) from janpa stdout.
+
+    Returns (None, None) when the log has no CLPO summary block.
+    """
+    summary = clpo_summary_from_log(log_path)
+    if not summary:
+        return None, None
+    labels = {i: v[0] for i, v in summary.items()}
+    occs = {i: v[2] for i, v in summary.items()}
     return labels, occs
+
+
+def clpo_ct_pairs_from_log(log_path: Path):
+    """Read JANPA's own charge-transfer table for cross-checking.
+
+    Returns ([(donor_index, charge, acceptor_index)], (n_below, total_e))
+    -- empty list when the CT section is absent.
+    """
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    if "Approximate charge transfer" not in text:
+        return [], None
+    sec = text.split("Approximate charge transfer", 1)[1]
+    sec = sec.split("IntErfragment", 1)[0]
+    pat = re.compile(r"^\s*(\d+)\s+.+?\s+[\d.-]+\s+-->\s+([\d.]+)\s+-->"
+                     r"\s+[\d.]+\s+.+?\s+(\d+)\s*$")
+    pairs = []
+    total = None
+    for line in sec.splitlines():
+        mt = pat.match(line)
+        if mt:
+            pairs.append((int(mt.group(1)), float(mt.group(2)),
+                          int(mt.group(3))))
+            continue
+        ms = re.search(r"(\d+) orbital pairs with total charge transfer of"
+                       r"\s+([\d.]+)", line)
+        if ms:
+            total = (int(ms.group(1)), float(ms.group(2)))
+    return pairs, total
 
 
 def _matmul(A: list[list[float]], B: list[list[float]]) -> list[list[float]]:
@@ -888,15 +932,11 @@ def _max_dev_from_identity(M: list[list[float]]) -> float:
     return worst
 
 
-def fock_orbital_energies(target: Path, pure: Path, s_path: Path,
-                          f_path: Path) -> tuple[list[float], str]:
-    """E_i = <phi_i|F|phi_i> for every MO block of ``target``, fully gated.
+def _load_pair_inputs(target: Path, pure: Path, s_path: Path, f_path: Path):
+    """Parse and validate the shared inputs of the energy analyses.
 
-    S and F come from JANPA's ``-doFock`` dumps (spherical AO basis, [GTO]
-    function order).  Gates: orthonormality of both orbital sets under S,
-    the canonical residual F C = S C diag(eps) on the .PURE MOs, and an
-    independent cross-check of E via the canonical-MO expansion weights.
-    Raises instead of returning untrustworthy numbers.
+    Returns (S, F, eps, Cm, Ct, occ_mo, occ_tgt) with Cm/Ct the canonical
+    and target MO block columns in AO order.
     """
     S = read_matrix_dump(s_path)
     F = read_matrix_dump(f_path)
@@ -921,6 +961,23 @@ def fock_orbital_energies(target: Path, pure: Path, s_path: Path,
     eps = [s[0] for s in src]
     Cm = [[src[k][2][i] for k in range(n)] for i in range(n)]  # [ao][mo]
     Ct = [[tgt[k][2][i] for k in range(n)] for i in range(n)]
+    occ_mo = [s[1] for s in src]
+    occ_tgt = [t[1] for t in tgt]
+    return S, F, eps, Cm, Ct, occ_mo, occ_tgt
+
+
+def fock_orbital_energies(target: Path, pure: Path, s_path: Path,
+                          f_path: Path) -> tuple[list[float], str]:
+    """E_i = <phi_i|F|phi_i> for every MO block of ``target``, fully gated.
+
+    S and F come from JANPA's ``-doFock`` dumps (spherical AO basis, [GTO]
+    function order).  Gates: orthonormality of both orbital sets under S,
+    the canonical residual F C = S C diag(eps) on the .PURE MOs, and an
+    independent cross-check of E via the canonical-MO expansion weights.
+    Raises instead of returning untrustworthy numbers.
+    """
+    S, F, eps, Cm, Ct, _, _ = _load_pair_inputs(target, pure, s_path, f_path)
+    n = len(S)
 
     SCm = _matmul(S, Cm)
     SCt = _matmul(S, Ct)
@@ -1069,6 +1126,228 @@ def plan_orbital_order(molden_path: Path, pure: Path | None = None,
     return SortPlan(mode, order, enes, "\n".join(lines))
 
 
+# ---------------------------------------------------------------------------
+# Pairwise donor -> acceptor interaction analysis (E(2)-like + charge
+# transfer).
+#
+# JANPA does NOT print NBO-style second-order interaction energies: its wiki
+# ("E2_pert") explains that the ingredients are the Fock matrix in a
+# localized basis, and warns that E(2) only has a well-defined meaning for
+# true Hartree-Fock wavefunctions -- under DFT the Fock matrix belongs to
+# the auxiliary Kohn-Sham system, so the numbers are indicative at best.
+# What JANPA does print is the charge transferred between localized orbitals
+# (its experimental "charge transfer analysis", fixed 0.01 e print
+# threshold).
+#
+# Both quantities are computable from the dumps this script already gates:
+#
+#   E2(i -> j) = n_i F_ij^2 / (F_jj - F_ii)     [kcal/mol, donor i occupied]
+#   q(i -> j)  = D_ij^2 / D_ii                 [electrons]
+#
+# with F the Fock matrix in the localized basis (F_ab = <phi_a|F|phi_b>) and
+# D the 1-RDM in the same basis (D_ab = <phi_a|D|phi_b>; built from the
+# .PURE MOs, whose Occup= values carry the electrons).  q is exactly the
+# number JANPA's own CT table prints -- verified against every printed pair
+# on the test molecules -- so this mode computes it for ALL pairs, not just
+# those above JANPA's fixed print threshold.
+# ---------------------------------------------------------------------------
+
+E2_KCAL = 627.5094740631     # Hartree -> kcal/mol
+E2_ROUTE_TOL = 1e-3          # route A vs B Fock agreement (relative)
+CT_REPRO_TOL = 2e-5          # |q_ours - q_janpa| vs the printed values
+E2_STRONG_RATIO = 0.25       # |F_ij|/dE above which second order fails
+
+
+def pair_interaction_analysis(
+        target: Path,
+        pure: Path | None = None,
+        s_matrix: Path | None = None,
+        fock_ao: Path | None = None,
+        nao: Path | None = None,
+        clpo2lho: Path | None = None,
+        lho2nao: Path | None = None,
+) -> tuple[list[str], list[str], str]:
+    """E(2)-like + charge-transfer pair table for a JANPA orbital export.
+
+    Returns (header_lines, table_rows, totals_line).
+    """
+    base = derive_base(target.stem)
+    d = target.parent
+    pure = pure or d / f"{base}.PURE"
+    s_matrix = s_matrix or d / f"{base}.S.txt"
+    fock_ao = fock_ao or d / f"{base}.fock_ao.txt"
+    missing = [p.name for p in (pure, s_matrix, fock_ao) if not p.is_file()]
+    if missing:
+        raise RuntimeError(
+            f"pair analysis needs {', '.join(missing)} next to "
+            f"{target.name}\n"
+            f"  produce them with:  python orca_to_janpa.py {base} --clpo"
+        )
+    S, F, eps, Cm, Ct, occ_mo, occ_tgt = _load_pair_inputs(
+        target, pure, s_matrix, fock_ao)
+    n = len(S)
+    SCm = _matmul(S, Cm)
+    SCt = _matmul(S, Ct)
+    ortho_t = _max_dev_from_identity(_matmul(list(zip(*Ct)), SCt))
+    ortho_m = _max_dev_from_identity(_matmul(list(zip(*Cm)), SCm))
+    FCm = _matmul(F, Cm)
+    resid = 0.0
+    scale = 0.0
+    for a in range(n):
+        for k in range(n):
+            resid = max(resid, abs(FCm[a][k] - SCm[a][k] * eps[k]))
+            scale = max(scale, abs(FCm[a][k]))
+    F_loc = _matmul(list(zip(*Ct)), _matmul(F, Ct))
+    U = _matmul(list(zip(*Cm)), SCt)      # [canonical k][target i]
+
+    # 1-RDM in the target basis: D = sum_k occ_k |u_k><u_k|
+    Dm = [[0.0] * n for _ in range(n)]
+    for k in range(n):
+        ok = occ_mo[k]
+        if ok == 0.0:
+            continue
+        uk = U[k]
+        for i in range(n):
+            uki = uk[i]
+            if uki == 0.0:
+                continue
+            row = Dm[i]
+            f = ok * uki
+            for j in range(n):
+                row[j] += f * uk[j]
+
+    checks = (f"gates  : {target.name} orthonormality {ortho_t:.2e} | "
+              f"{pure.name} orthonormality {ortho_m:.2e} | "
+              f"F C - S C eps {resid:.2e} (scale {scale:.2f})")
+    if (ortho_t > SORT_ORTHO_TOL or ortho_m > SORT_ORTHO_TOL
+            or resid > SORT_FOCK_TOL * max(scale, 1.0)):
+        raise RuntimeError("pair analysis validation FAILED: " + checks)
+
+    # optional independent route B: JANPA's own NAO data (wiki E2_pert recipe)
+    nao = nao or d / f"{base}.fock_nao.txt"
+    clpo2lho = clpo2lho or d / f"{base}.clpo2lho.txt"
+    lho2nao = lho2nao or d / f"{base}.lho2nao.txt"
+    if all(p.is_file() for p in (nao, clpo2lho, lho2nao)):
+        F_NAO = read_matrix_dump(nao)
+        Cna = _matmul(read_matrix_dump(clpo2lho), read_matrix_dump(lho2nao))
+        dev_b = _max_dev_from_identity(_matmul(Cna, list(zip(*Cna))))
+        F_b = _matmul(Cna, _matmul(F_NAO, list(zip(*Cna))))
+        diff_b = max(abs(F_loc[i][j] - F_b[i][j])
+                     for i in range(n) for j in range(n))
+        scale_b = max(abs(F_loc[i][j]) for i in range(n) for j in range(n))
+        checks += (f" | route A vs B {diff_b:.2e} (max|F| {scale_b:.1f}, "
+                   f"basis {dev_b:.1e})")
+        if (dev_b > SORT_ORTHO_TOL
+                or diff_b > E2_ROUTE_TOL * max(scale_b, 1.0)):
+            raise RuntimeError("pair analysis validation FAILED: " + checks)
+
+    # labels and JANPA's own CT numbers -- only when the log describes
+    # this exact export (occupancy fingerprint)
+    labels = None
+    ct_note = ""
+    log_path = d / f"{base}.JANPA"
+    if not log_path.is_file():
+        ct_note = (f"no {log_path.name} -- no orbital labels and no CT "
+                   "cross-check")
+    else:
+        summary = clpo_summary_from_log(log_path)
+        if not summary or len(summary) != len(occ_tgt):
+            ct_note = (f"{log_path.name} does not describe this export "
+                       f"({len(summary)} labels vs {len(occ_tgt)} MOs)")
+        else:
+            worst_lab = max(abs(occ_tgt[i] - summary[i + 1][2])
+                            for i in range(len(occ_tgt)))
+            if worst_lab > LABEL_OCC_TOL:
+                ct_note = (f"{log_path.name} occupancy mismatch "
+                           f"({worst_lab:.1e}) -- labels/CT check skipped")
+            else:
+                labels = {i: v[1] for i, v in summary.items()}
+                pairs, _total = clpo_ct_pairs_from_log(log_path)
+                if pairs:
+                    worst_ct = max(abs(Dm[i - 1][j - 1] ** 2
+                                       / Dm[i - 1][i - 1] - q)
+                                   for i, q, j in pairs)
+                    ct_note = (f"JANPA CT reproduced {len(pairs)}/"
+                               f"{len(pairs)} printed pairs "
+                               f"(max |dq| {worst_ct:.1e})")
+                    if worst_ct > CT_REPRO_TOL:
+                        raise RuntimeError(
+                            "pair analysis validation FAILED: " + checks
+                            + " | " + ct_note)
+                else:
+                    ct_note = (f"{log_path.name}: no CT pairs above "
+                               "JANPA's 0.01 e print threshold")
+
+    rows = []
+    n_skip = 0
+    for i in range(n):
+        if occ_tgt[i] <= 1.0:
+            continue
+        for j in range(n):
+            if occ_tgt[j] > 1.0:
+                continue
+            de = F_loc[j][j] - F_loc[i][i]
+            dii = Dm[i][i]
+            q = (Dm[i][j] ** 2 / dii) if dii > 1e-12 else 0.0
+            e2 = None
+            strong = False
+            if de > 1e-9:
+                e2 = occ_tgt[i] * F_loc[i][j] ** 2 / de * E2_KCAL
+                strong = abs(F_loc[i][j]) / de >= E2_STRONG_RATIO
+            else:
+                n_skip += 1
+            rows.append((e2, q, i, j, F_loc[i][j], de, strong))
+    rows.sort(key=lambda r: (r[0] is None, -(r[0] or 0.0)))
+
+    def name(idx: int) -> str:
+        return labels[idx + 1] if labels else f"CLPO {idx + 1}"
+
+    table_rows = []
+    for k, (e2, q, i, j, fij, de, strong) in enumerate(rows, 1):
+        e2s = f"{e2:11.2f}" if e2 is not None else "          -"
+        table_rows.append(
+            f"{k:>4}  {name(i):>18} -> {name(j):<18} "
+            f"{fij:+.6f} {de:9.5f} {e2s} {q:9.5f}"
+            + (" *" if strong else ""))
+
+    sum_e2 = sum(r[0] for r in rows if r[0] is not None)
+    sum_q = sum(r[1] for r in rows)
+    n_strong = sum(1 for r in rows if r[6])
+    n_don = sum(1 for o in occ_tgt if o > 1.0)
+    n_acc = len(occ_tgt) - n_don
+    totals = (f"totals : sum E2 = {sum_e2:.1f} kcal/mol | "
+              f"sum q = {sum_q:.5f} e | {n_don} donors x {n_acc} acceptors "
+              f"= {len(rows)} pairs"
+              + (f" | {n_strong} strongly mixed (*)" if n_strong else "")
+              + (f" | {n_skip} skipped: dE <= 0" if n_skip else ""))
+
+    header = [
+        f"pair-interaction analysis  [{target.name}]",
+        f"inputs : {s_matrix.name}, {fock_ao.name}, {pure.name}",
+        f"check  : {ct_note}",
+        checks,
+        "note   : E2 = n_i F_ij^2/(F_jj-F_ii) is a perturbation estimate "
+        "with a well-defined",
+        "         meaning in Hartree-Fock; under DFT the 'Fock' operator "
+        "belongs to the",
+        "         auxiliary Kohn-Sham system, so read E2 with care there "
+        "and prefer the",
+        "         charge q = D_ij^2/D_ii (the quantity JANPA's CT analysis "
+        "prints; see its",
+        "         wiki page 'E2_pert' and Nikolaienko et al., J. Comput. "
+        "Chem. 39 (2018) 1090).",
+        f"         rows marked * have |F_ij|/(F_jj-F_ii) >= "
+        f"{E2_STRONG_RATIO}: the two orbitals are strongly mixed, the "
+        "second-order",
+        "         estimate is not meaningful for them (often a sign the "
+        "Lewis-like",
+        "         reference itself is inadequate -- e.g. 3c-2e bonding).",
+        f"{'#':>4}  {'donor':>18} -> {'acceptor':<18} {'F_ij':>9} "
+        f"{'dE/Ha':>9} {'E2(kcal/mol)':>11} {'q(e)':>9}",
+    ]
+    return header, table_rows, totals
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="orca_to_janpa",
@@ -1164,22 +1443,40 @@ def build_parser() -> argparse.ArgumentParser:
         "--pure",
         type=Path,
         default=None,
-        help="--sort-energy input override: canonical MOs + energies "
+        help="--sort-energy/--e2 input override: canonical MOs + energies "
         "(default: <base>.PURE next to the molden file)",
     )
     ap.add_argument(
         "--s-matrix",
         type=Path,
         default=None,
-        help="--sort-energy input override: JANPA overlap dump "
+        help="--sort-energy/--e2 input override: JANPA overlap dump "
         "(default: <base>.S.txt)",
     )
     ap.add_argument(
         "--fock-ao",
         type=Path,
         default=None,
-        help="--sort-energy input override: JANPA Fock dump in the AO "
+        help="--sort-energy/--e2 input override: JANPA Fock dump in the AO "
         "basis (default: <base>.fock_ao.txt)",
+    )
+    ap.add_argument(
+        "--e2",
+        type=Path,
+        default=None,
+        metavar="CLPO.MOLDEN",
+        help="Pairwise donor->acceptor interaction table for a JANPA "
+        "export: E2 = n_i F_ij^2/(F_jj-F_ii) in kcal/mol (Fock matrix in "
+        "the localized basis) plus the charge transfer q = D_ij^2/D_ii "
+        "that JANPA's own CT analysis prints. Reads the --clpo dumps; "
+        "cross-checks against JANPA's printed CT values when the log "
+        "describes the export",
+    )
+    ap.add_argument(
+        "--e2-out",
+        type=Path,
+        default=None,
+        help="Output for --e2 (default: <stem>_E2.txt)",
     )
     ap.add_argument(
         "--avogadro",
@@ -1203,11 +1500,26 @@ def main(argv: list[str] | None = None) -> None:
             and args.fix_markers is None):
         ap.error("--sort-energy is a --to-cart/--fix-markers modifier")
     if ((args.pure or args.s_matrix or args.fock_ao)
-            and not args.sort_energy):
-        ap.error("--pure/--s-matrix/--fock-ao are --sort-energy inputs")
+            and not (args.sort_energy or args.e2 is not None)):
+        ap.error("--pure/--s-matrix/--fock-ao are --sort-energy/--e2 inputs")
 
     if args.diagnose is not None:
         print(diagnose_nbo_output(args.diagnose))
+        return
+    if args.e2 is not None:
+        header, table, totals = pair_interaction_analysis(
+            args.e2, args.pure, args.s_matrix, args.fock_ao)
+        for line in header:
+            print(line)
+        for line in table[:25]:
+            print(line)
+        if len(table) > 25:
+            print(f"      ... ({len(table) - 25} more rows in the file)")
+        print(totals)
+        out = args.e2_out or args.e2.with_name(args.e2.stem + "_E2.txt")
+        out.write_text("\n".join(header + table + [totals]) + "\n",
+                       encoding="utf-8", newline="\n")
+        print(f"Wrote {out}")
         return
     if args.to_cart is not None:
         out = args.cart_out or args.to_cart.with_name(
@@ -1257,12 +1569,17 @@ def main(argv: list[str] | None = None) -> None:
         else args.janpa_args
     )
     if args.clpo:
-        # CLPO export plus the dumps that make --sort-energy possible
-        # (-doFock builds the Fock matrix from the .PURE orbital energies).
+        # CLPO export plus the dumps the analysis modes need: -doFock
+        # builds the Fock matrix from the .PURE orbital energies; the NAO
+        # Fock and the LHO transformation chain feed the independent
+        # route-B cross-check of --e2 (JANPA wiki "E2_pert" recipe).
         extra = [
             "-CLPO_Molden_File", f"{base}_CLPO.molden",
             "-doFock",
             "-Fock_AO_File", f"{base}.fock_ao.txt",
+            "-Fock_NAO_File", f"{base}.fock_nao.txt",
+            "-CLPO2LHO_File", f"{base}.clpo2lho.txt",
+            "-LHO2NAO_File", f"{base}.lho2nao.txt",
             "-S_Matrix_File", f"{base}.S.txt",
             "-MatrixFloatNumberFormat", "%.9f",
             "-RyOccPrintThreshold", "-1",
@@ -1275,9 +1592,12 @@ def main(argv: list[str] | None = None) -> None:
     print(f"Done. JANPA output saved to {out_file}")
     if args.clpo:
         print(f"CLPO export  : {base}_CLPO.molden  (+ {base}.S.txt, "
-              f"{base}.fock_ao.txt)")
+              f"{base}.fock_ao.txt, {base}.fock_nao.txt, "
+              f"{base}.clpo2lho.txt, {base}.lho2nao.txt)")
         print(f"Next         : python {Path(sys.argv[0]).name} --to-cart "
               f"{base}_CLPO.molden --avogadro --sort-energy")
+        print(f"               python {Path(sys.argv[0]).name} --e2 "
+              f"{base}_CLPO.molden")
 
 
 if __name__ == "__main__":

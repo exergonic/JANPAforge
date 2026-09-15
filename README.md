@@ -61,14 +61,16 @@ What it does per `<base>`:
   (add `--dot47 file.47` for the correlated `-ds47` route)
 - `[3/3]` runs `janpa -i <base>.PURE`, saves `<base>.JANPA`
 
-Add `--clpo` to also export the CLPOs and the data the viewer-order step
-needs (see "Orbital order" below):
+Add `--clpo` to also export the CLPOs and the data the analysis modes need
+(see "Orbital order" and "Orbital-interaction analysis" below):
 
 ```powershell
 python orca_to_janpa.py ethene --clpo
 # -> ethene_CLPO.molden, ethene.S.txt, ethene.fock_ao.txt,
+#    ethene.fock_nao.txt, ethene.clpo2lho.txt, ethene.lho2nao.txt,
 #    full CLPO labels in ethene.JANPA
 python orca_to_janpa.py --to-cart ethene_CLPO.molden --avogadro --sort-energy
+python orca_to_janpa.py --e2 ethene_CLPO.molden
 ```
 
 Extra flags after `--` are passed to `janpa.jar`, e.g.:
@@ -147,6 +149,63 @@ numbers unless `--sort-energy` rewrote them, and molden2molden's reader
 crashes on blank lines inside `[Atoms]` / a missing blank at the end of
 `[GTO]` — outputs of this script already use the safe layout with LF
 endings.
+
+### Orbital-interaction analysis (`--e2`)
+
+JANPA has no E(2) feature — its wiki page *"Can I compute the 'E(2) energy'
+using the output of JANPA?"* explains why: the Fock matrix is only fully
+meaningful for Hartree-Fock, under DFT it belongs to the auxiliary
+Kohn-Sham system, and E(2) is not an observable. What JANPA does print is
+an experimental charge-transfer table (donor -> acceptor pairs above a
+fixed 0.01 e threshold). `--e2` computes both quantities for **every** pair
+of any JANPA export and writes `<stem>_E2.txt`:
+
+    python orca_to_janpa.py --e2 ethene_CLPO.molden
+
+- `E2 = n_i F_ij^2/(F_jj - F_ii)` [kcal/mol] — the NBO-style second-order
+  perturbation estimate in the localized basis. Read it with the caveat
+  printed in the report: well-defined for HF, indicative for DFT (prefer
+  `q` there).
+- `q = D_ij^2/D_ii` [e] — the charge transferred between the two orbitals.
+  This is exactly the number JANPA prints in its "Approximate charge
+  transfer analysis"; `--e2` reproduces every printed pair (checked at run
+  time whenever the log describes the export) and shows the pairs below
+  JANPA's print threshold.
+- Rows marked `*` have |F_ij|/(F_jj-F_ii) >= 0.25: the two orbitals are
+  strongly mixed and the second-order estimate is not meaningful for them
+  (often a sign the Lewis-like reference itself is inadequate — e.g. the
+  3c-2e bridged ethyl cation surfaces as one strongly mixed pair instead of
+  a hyperconjugation energy).
+
+`--e2` gates everything the way `--sort-energy` does, plus an independent
+cross-check of the whole Fock matrix against JANPA's own NAO data (the
+`E2_pert` recipe: `<base>.fock_nao.txt` transformed with
+`<base>.clpo2lho.txt` @ `<base>.lho2nao.txt`), and it refuses to write on
+mismatch.
+
+Numbers from this folder (wB97X-D3/def2-TZVP): isobutene sigma(C-H) ->
+pi*(C=C) ~5 kcal/mol per methyl C-H; formaldehyde O lone pair ->
+sigma*(C-H) ~29 kcal/mol; tert-butyl cation sigma(C-H) -> empty-p
+~34 kcal/mol x3; water (HF) tops out at ~2 kcal/mol.
+
+### Which JANPA orbital set (all work with the viewer/analysis modes)
+
+- **NAO** (natural atomic orbitals) — the orthonormal atomic set behind NPA
+  charges, Wiberg bond indices, angular-momentum populations
+  (`-NAO_Molden_File`, Fock: `<base>.fock_nao.txt`).
+- **PNAO** — pre-orthogonalization NAOs; NAO-construction intermediate.
+- **LHO** (localized hybrid orbitals) — the atom-centred hybrids the CLPOs
+  are built from (`-LHO_Molden_File`; `<base>.lho2nao.txt` = LHOs in the
+  NAO basis).
+- **AHO / LPO** — the LPO family (Int J Quantum Chem 2019, e25798);
+  property-optimized localized orbitals and their atomic hybrids.
+- **CLPO** ("chemist's LPO") — the NBO-analog Lewis-like set (BD/NB/LP/RY);
+  the one to use for bonding analysis, orbital visualization and `--e2`.
+
+The naive approach of just running `janpa` and reading the files also
+needs: the janpa stdout (`<base>.JANPA`) for labels, and a `-doFock` run
+for the matrices (`-Fock_AO_File`, `-Fock_NAO_File`, `-S_Matrix_File`,
+`-CLPO2LHO_File`, `-LHO2NAO_File`; `-doFock` is a bare flag).
 
 ## Project rules
 
