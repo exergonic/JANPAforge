@@ -22,7 +22,7 @@ Settings used in this run:
  -npacharges: (empty)
  -NAO_Molden_File: (empty)
  -LHO_Molden_File: (empty)
- -CLPO_Molden_File: isobutene_CLPO.molden
+ -CLPO_Molden_File: isobutene_CLPO_spherical.molden
  -PrintGeom: false
  -WibergBondOrders_File: (empty)
  -D_Matrix_File: (empty)
@@ -81,7 +81,7 @@ Data loaded successfully
  Number of basis functions: 172; number of molecular orbitals: 172 
 
 Building overlap S and dipole matrices...
-Overlap & dipole integrals evaluated in 0.023 seconds
+Overlap & dipole integrals evaluated in 0.016 seconds
 Checking whether the basis functions are unity-normalized...
  Maximum deviation of the basis function norm2 from unity: BFN 11 (0-based num.), max|norm2-1| = 1.000E-09 
 Checking for the eigenvalues (linear (in)dependency) of the basis function overlap matrix...
@@ -1105,7 +1105,7 @@ done
 
 Exporting matrix "LHOs in NAO basis" to isobutene.lho2nao.txt
 done
-Writing CLPOs to	isobutene_CLPO.molden
+Writing CLPOs to	isobutene_CLPO_spherical.molden
 Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
 
 

@@ -22,7 +22,7 @@ Settings used in this run:
  -npacharges: (empty)
  -NAO_Molden_File: (empty)
  -LHO_Molden_File: (empty)
- -CLPO_Molden_File: ethylium_CLPO.molden
+ -CLPO_Molden_File: ethylium_CLPO_spherical.molden
  -PrintGeom: false
  -WibergBondOrders_File: (empty)
  -D_Matrix_File: (empty)
@@ -81,7 +81,7 @@ Data loaded successfully
  Number of basis functions: 92; number of molecular orbitals: 92 
 
 Building overlap S and dipole matrices...
-Overlap & dipole integrals evaluated in 0.009 seconds
+Overlap & dipole integrals evaluated in 0.013 seconds
 Checking whether the basis functions are unity-normalized...
  Maximum deviation of the basis function norm2 from unity: BFN 11 (0-based num.), max|norm2-1| = 1.000E-09 
 Checking for the eigenvalues (linear (in)dependency) of the basis function overlap matrix...
@@ -757,14 +757,14 @@ done
 
 Exporting matrix "LHOs in NAO basis" to ethylium.lho2nao.txt
 done
-Writing CLPOs to	ethylium_CLPO.molden
+Writing CLPOs to	ethylium_CLPO_spherical.molden
 Please, note that 'Energy' of the orbitals in MOLDEN file will simply be set to their sequential numbers!
 
 
 
 0 warning(s)
 
-Total run time: 0 min, 0.5 sec
+Total run time: 0 min, 0.7 sec
 
 
                           * * *                                         

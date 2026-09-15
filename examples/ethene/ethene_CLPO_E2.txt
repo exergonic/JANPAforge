@@ -1,7 +1,7 @@
-pair-interaction analysis  [ethene_CLPO.molden]
+pair-interaction analysis  [ethene_CLPO_spherical.molden]
 inputs : ethene.S.txt, ethene.fock_ao.txt, ethene.PURE
 check  : ethene.JANPA: no CT pairs above JANPA's 0.01 e print threshold
-gates  : ethene_CLPO.molden orthonormality 2.97e-07 | ethene.PURE orthonormality 3.46e-07 | F C - S C eps 1.30e-07 (scale 6.85) | route A vs B 2.96e-07 (max|F| 13.2, basis 1.5e-09)
+gates  : ethene_CLPO_spherical.molden orthonormality 2.97e-07 | ethene.PURE orthonormality 3.46e-07 | F C - S C eps 1.30e-07 (scale 6.85) | route A vs B 2.96e-07 (max|F| 13.2, basis 1.5e-09)
 note   : E2 = n_i F_ij^2/(F_jj-F_ii) is a perturbation estimate with a well-defined
          meaning in Hartree-Fock; under DFT the 'Fock' operator belongs to the
          auxiliary Kohn-Sham system, so read E2 with care there and prefer the

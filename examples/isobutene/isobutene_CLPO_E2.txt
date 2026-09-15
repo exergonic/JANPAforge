@@ -1,7 +1,7 @@
-pair-interaction analysis  [isobutene_CLPO.molden]
+pair-interaction analysis  [isobutene_CLPO_spherical.molden]
 inputs : isobutene.S.txt, isobutene.fock_ao.txt, isobutene.PURE
 check  : JANPA CT reproduced 6/6 printed pairs (max |dq| 3.7e-06)
-gates  : isobutene_CLPO.molden orthonormality 7.93e-07 | isobutene.PURE orthonormality 1.01e-06 | F C - S C eps 1.54e-07 (scale 9.69) | route A vs B 1.08e-06 (max|F| 17.8, basis 1.7e-09)
+gates  : isobutene_CLPO_spherical.molden orthonormality 7.93e-07 | isobutene.PURE orthonormality 1.01e-06 | F C - S C eps 1.54e-07 (scale 9.69) | route A vs B 1.08e-06 (max|F| 17.8, basis 1.7e-09)
 note   : E2 = n_i F_ij^2/(F_jj-F_ii) is a perturbation estimate with a well-defined
          meaning in Hartree-Fock; under DFT the 'Fock' operator belongs to the
          auxiliary Kohn-Sham system, so read E2 with care there and prefer the

@@ -1,7 +1,7 @@
-pair-interaction analysis  [water_CLPO.molden]
+pair-interaction analysis  [water_CLPO_spherical.molden]
 inputs : water.S.txt, water.fock_ao.txt, water.PURE
 check  : water.JANPA: no CT pairs above JANPA's 0.01 e print threshold
-gates  : water_CLPO.molden orthonormality 3.30e-09 | water.PURE orthonormality 4.11e-09 | F C - S C eps 9.09e-09 (scale 20.54) | route A vs B 1.10e-08 (max|F| 20.3, basis 1.4e-09)
+gates  : water_CLPO_spherical.molden orthonormality 3.30e-09 | water.PURE orthonormality 4.11e-09 | F C - S C eps 9.09e-09 (scale 20.54) | route A vs B 1.10e-08 (max|F| 20.3, basis 1.4e-09)
 note   : E2 = n_i F_ij^2/(F_jj-F_ii) is a perturbation estimate with a well-defined
          meaning in Hartree-Fock; under DFT the 'Fock' operator belongs to the
          auxiliary Kohn-Sham system, so read E2 with care there and prefer the

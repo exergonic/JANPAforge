@@ -1,7 +1,7 @@
-pair-interaction analysis  [ethylium_CLPO.molden]
+pair-interaction analysis  [ethylium_CLPO_spherical.molden]
 inputs : ethylium.S.txt, ethylium.fock_ao.txt, ethylium.PURE
 check  : ethylium.JANPA: no CT pairs above JANPA's 0.01 e print threshold
-gates  : ethylium_CLPO.molden orthonormality 2.13e-07 | ethylium.PURE orthonormality 2.46e-07 | F C - S C eps 9.88e-08 (scale 7.31) | route A vs B 3.50e-07 (max|F| 14.7, basis 1.6e-09)
+gates  : ethylium_CLPO_spherical.molden orthonormality 2.13e-07 | ethylium.PURE orthonormality 2.46e-07 | F C - S C eps 9.88e-08 (scale 7.31) | route A vs B 3.50e-07 (max|F| 14.7, basis 1.6e-09)
 note   : E2 = n_i F_ij^2/(F_jj-F_ii) is a perturbation estimate with a well-defined
          meaning in Hartree-Fock; under DFT the 'Fock' operator belongs to the
          auxiliary Kohn-Sham system, so read E2 with care there and prefer the

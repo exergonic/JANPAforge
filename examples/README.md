@@ -7,8 +7,10 @@ place using only the files in the folder:
 
 ```powershell
 cd ethene
-python ../orca_to_janpa.py --to-cart ethene_CLPO.molden --avogadro --sort-energy
-python ../orca_to_janpa.py --e2 ethene_CLPO.molden
+# re-create the viewer file from the substrate:
+python ../orca_to_janpa.py --to-cart ethene_CLPO_spherical.molden --sort-energy --avogadro
+# re-run the interaction table:
+python ../orca_to_janpa.py --e2 ethene_CLPO_spherical.molden
 ```
 
 (The originals of these files live in the ORCA calculation folders; these
@@ -20,26 +22,29 @@ copies are the pipeline artifacts as produced.)
 | --- | --- | --- |
 | `<mol>.molden.input` | `orca_2mkl` | SCF MOs + basis, ORCA flavour |
 | `<mol>.PURE` | `molden2molden` | canonical Molden; janpa input, and the canonical reference for `--sort-energy` / `--e2` |
-| `<mol>_CLPO.molden` | `janpa` | the CLPO export (spherical, `Ene=` = sequential numbers) |
+| `<mol>_CLPO_spherical.molden` | `janpa` + label fixes | the **substrate**: spherical d/f, `Ene=` = sequential numbers, markers + `Spin=` corrected; the analysis input |
 | `<mol>.JANPA` | janpa stdout | NPA charges, Wiberg bond indices, full CLPO labels, JANPA's own charge-transfer table |
 | `<mol>.S.txt`, `<mol>.fock_ao.txt` | `janpa -doFock` | overlap / Fock in the AO basis (spherical, [GTO] order) |
 | `<mol>.fock_nao.txt`, `<mol>.clpo2lho.txt`, `<mol>.lho2nao.txt` | `janpa -doFock` | NAO Fock and the LHO transformation chain (route-B cross-check inside `--e2`) |
 | `<mol>_CLPO_E2.txt` | `--e2` | pair-interaction table: E2 (kcal/mol) + charge transfer q (e) |
-| `<mol>_CLPO_cart.molden` | `--to-cart --sort-energy` | cartesian d/f, real energies, fractional Occup (viewers needing cartesian only) |
-| `<mol>_CLPO_Avogadro.molden` | `--to-cart --avogadro --sort-energy` | **open this one in Avogadro**: cartesian + integer `Occup` + `Spin= Alpha` + energy order |
-| `<mol>_CLPO_7F.molden` | `--fix-markers --sort-energy` | spherical with corrected `[5D]`/`[7F]` markers (MOrbVis) |
+| `<mol>_CLPO.molden` | `--clpo` | **the viewer file**: cartesian d/f, markers clean, real Fock energies, occupied-first order; generated with `--avogadro` in these copies (integer `Occup`) — **open this one in Avogadro** |
+| `water_CLPO_Alpha.molden` (water only) | `--clpo` without `--avogadro` | cartesian + fractional `Occup`: the repro file for the Avogadro electron-counting bug |
 | `<mol>.xyz` | ORCA | geometry |
 
-Not every folder carries every view file yet — the two earliest examples
-(ethene, formaldehyde) have them all; the later analysis-only ones
-(water, isobutene, ethylium, tbutyl) have `_CLPO_E2.txt` but no
-`_cart`/`_Avogadro`/`_7F` files yet.
+Every folder carries the complete set: the substrate, the viewer file, the
+dumps, the E2 table and the labels. To regenerate the viewer file with the
+true fractional `Occup` (instead of the Avogadro `2/0`), rerun it from the
+substrate:
+
+```powershell
+python ../orca_to_janpa.py --to-cart ethene_CLPO_spherical.molden --sort-energy
+```
 
 ## The molecules
 
 | example | level of theory | what it demonstrates |
 | --- | --- | --- |
-| `ethene/` | wB97X-D3/def2-TZVP | the reference example: the pi CLPO **is** the canonical HOMO; sigma(C-H) -> sigma*(C-H) hyperconjugation ~5.6 kcal/mol; all view files |
+| `ethene/` | wB97X-D3/def2-TZVP | the reference example: the pi CLPO **is** the canonical HOMO; sigma(C-H) -> sigma*(C-H) hyperconjugation ~5.6 kcal/mol; substrate + viewer pair |
 | `water/` | **HF**/def2-SVP | the Hartree-Fock case (where E(2) is defensible); weak delocalization, table tops out at ~2 kcal/mol |
 | `formaldehyde/` | wB97X-D3/def2-TZVP | lone-pair donor: O n -> sigma*(C-H) ~29 kcal/mol x2 (classic negative hyperconjugation) |
 | `isobutene/` | wB97X-D3/def2-TZVP | sigma(C-H) -> pi*(C=C) hyperconjugation ~5.4 kcal/mol per methyl C-H; vinylic C-H -> sigma*(C-C) ~8.7 |

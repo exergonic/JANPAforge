@@ -20,16 +20,22 @@ What it does per `<base>`:
   (add `--dot47 file.47` for the correlated `-ds47` route)
 - `[3/3]` runs `janpa -i <base>.PURE`, saves `<base>.JANPA`
 
-Add `--clpo` to also export the CLPOs and the data the analysis modes need
-(see "Orbital order" and "Orbital-interaction analysis" below):
+Add `--clpo` to also export the viewer file, the retained spherical
+substrate, and the data the analysis modes need (see "Viewing orbitals"
+and "Orbital-interaction analysis"):
 
 ```powershell
-python orca_to_janpa.py ethene --clpo
-# -> ethene_CLPO.molden, ethene.S.txt, ethene.fock_ao.txt,
-#    ethene.fock_nao.txt, ethene.clpo2lho.txt, ethene.lho2nao.txt,
-#    full CLPO labels in ethene.JANPA
-python orca_to_janpa.py --to-cart ethene_CLPO.molden --avogadro --sort-energy
-python orca_to_janpa.py --e2 ethene_CLPO.molden
+python orca_to_janpa.py ethene --clpo --avogadro --e2
+# -> ethene_CLPO.molden            the viewer file: cartesian d/f,
+#                                  corrected Spin=, real energies,
+#                                  occupied-first; integer Occup with
+#                                  --avogadro (the Avogadro workaround)
+# -> ethene_CLPO_spherical.molden  the substrate: JANPA's export with
+#                                  corrected markers/Spin (analysis input)
+# -> ethene.S.txt, ethene.fock_ao.txt, ethene.fock_nao.txt,
+#    ethene.clpo2lho.txt, ethene.lho2nao.txt           (janpa dumps)
+# -> ethene_CLPO_E2.txt            with --e2: the pair-interaction table
+#    and the full CLPO labels in ethene.JANPA
 ```
 
 Extra flags after `--` are passed to `janpa.jar`, e.g.:
@@ -46,34 +52,54 @@ charge sum 0.00000, CLPO C=C / C–H bonding graph correct. No `NPA`/`NBO`
 keyword needed in the ORCA input for this route — a plain SCF `.gbw`
 suffices.
 
-## Viewing orbitals (Avogadro needs cartesian, MOrbVis needs markers)
+## Viewing orbitals (both fixes are on by default)
 
-JANPA writes spherical MOs. Two viewer quirks, both fixed by this script:
+Raw JANPA exports have two universal defects — spherical d/f coefficients
+(Avogadro renders cartesian only) and wrong marker lines (JANPA omits
+`[7F]` and writes a spurious `[9G]`, which mistracks f shells in readers
+that honor markers). Both fixes are applied **by default** by the pipeline.
+`--clpo` writes exactly two Molden files per localization set:
 
-- **MOrbVis** honors `[5D]`/`[7F]`/`[9G]` (checked against its WebGPU
-  evaluator source), but JANPA omits `[7F]` — f shells then evaluate as
-  10-component cartesian and every orbital mistracks. Fix:
-  `python orca_to_janpa.py --fix-markers ethene_CLPO.molden`
-  (also drops JANPA's spurious `[9G]` when no g shells exist).
-- **Avogadro** renders cartesian only (same reason `puream=0` was needed
-  for avo_ibo). Fix:
-  `python orca_to_janpa.py --to-cart ethene_CLPO.molden --avogadro`
-  (d 5→6, f 7→10 in Molden order, markers dropped, `--spin Alpha`
-  implied). `--avogadro` additionally reorders MOs occupied-first and
-  writes integer `Occup= 2/0`: Avogadro parses `Occup` as int
+- `<base>_CLPO.molden` — **the viewer file**: cartesian d/f, markers
+  clean, `Spin=` corrected from the canonical source, real Fock energies,
+  occupied-first order (see "Orbital order and energies"). One file, one
+  name, works in every Molden reader. With `--avogadro` the very same file
+  instead gets integer `Occup= 2/0`, because Avogadro parses `Occup` as int
   (1.986 → 1, miscounting 16 electrons as 8) and fills orbitals
-  positionally by energy order, so fractional occupations with
-  all-zero energies mislabel virtuals as occupied. The maps are derived numerically
-  from Gaussian moments for normalized functions on both sides and
-  cross-checked against `molden2molden -cart2pure` unit responses;
-  every run is gated and the script refuses to write on mismatch.
+  positionally, so fractional occupations mislabel occupied/virtual. Same
+  filename either way — drop the flag when the upstream bug is fixed.
+- `<base>_CLPO_spherical.molden` — the **analysis substrate**: JANPA's
+  export with only the two corrected labels (markers, `Spin=`); JANPA's
+  order, sequential `Ene=` values and fractional `Occup` stay exactly as
+  written. It is the input for `--e2` / `--sort-energy` (same spherical
+  basis as the `-doFock` dumps) and for further analysis with JANPA or
+  other tools; a rerun regenerates it byte-identically from `<base>.PURE`.
 
-### Orbital order and energies (`--sort-energy`)
+The standalone converters remain for re-processing existing files:
+
+- `python orca_to_janpa.py --to-cart FILE.molden [--avogadro]` — the
+  cartesian conversion (d 5→6, f 7→10 in Molden order, markers dropped).
+- `python orca_to_janpa.py --fix-markers FILE.molden` — the spherical
+  convention with corrected markers (`[5D]` if d/f shells exist, `[7F]`
+  if f shells exist, `[9G]` only for real g shells), for readers that
+  prefer spherical files.
+
+Both also correct `Spin=` by default: a uniform closed-shell set takes the
+label of the sibling `<base>.PURE` (`--spin Alpha|Beta` overrides).
+
+The spherical↔cartesian maps are derived numerically from Gaussian moments
+for normalized functions on both sides and cross-checked against
+`molden2molden -cart2pure` unit responses; every run is gated and the
+script refuses to write on mismatch.
+
+### Orbital order and energies
 
 A JANPA export carries no orbital energies -- every `Ene=` is a sequential
 number (0, 1, 2, ...) and the MOs sit in JANPA's internal hybrid-pairing
-order, so the viewer's orbital list is unreadable. `--sort-energy` (a
-`--to-cart` / `--fix-markers` modifier) fixes both:
+order, so the viewer's orbital list is unreadable. The viewer file fixes
+both, always (the pipeline applies this by default; `--sort-energy` remains
+as the modifier for standalone `--to-cart` / `--fix-markers`
+re-processing):
 
 1. it computes the Fock expectation energy of every orbital, E = <phi|F|phi>
    -- the diagonal Fock element, i.e. the physically meaningful energy of a
@@ -103,11 +129,11 @@ the C-C / C-H antibonding partners, then 72 Rydberg orbitals. Works on any
 JANPA export (CLPO, LHO, NAO) because it only uses the exported AO
 coefficients.
 
-Caveats inherited from JANPA's export: `[MO]` energies are sequential
-numbers unless `--sort-energy` rewrote them, and molden2molden's reader
-crashes on blank lines inside `[Atoms]` / a missing blank at the end of
-`[GTO]` — outputs of this script already use the safe layout with LF
-endings.
+Caveats inherited from JANPA's export: the substrate's `[MO]` energies are
+still sequential numbers (only the viewer file carries real energies), and
+molden2molden's reader crashes on blank lines inside `[Atoms]` / a missing
+blank at the end of `[GTO]` — outputs of this script already use the safe
+layout with LF endings.
 
 ### Orbital-interaction analysis (`--e2`)
 
@@ -119,7 +145,8 @@ an experimental charge-transfer table (donor -> acceptor pairs above a
 fixed 0.01 e threshold). `--e2` computes both quantities for **every** pair
 of any JANPA export and writes `<stem>_E2.txt`:
 
-    python orca_to_janpa.py --e2 ethene_CLPO.molden
+    python orca_to_janpa.py --e2 ethene_CLPO_spherical.molden
+    # or in one shot: python orca_to_janpa.py ethene --clpo --e2
 
 - `E2 = n_i F_ij^2/(F_jj - F_ii)` [kcal/mol] — the NBO-style second-order
   perturbation estimate in the localized basis. Read it with the caveat

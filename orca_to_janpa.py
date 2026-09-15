@@ -19,11 +19,14 @@ JANPA wiki (ORCA 3.0.x era) no longer produces a ``.47`` file --
 ORCA just logs ``Now starting NBO....`` + the dummy output and moves
 on.  See ``diagnose_nbo_output()`` and README.md.
 
-Viewer workflow: ``--to-cart`` / ``--fix-markers`` rewrite a JANPA export
-for Avogadro / MOrbVis, and ``--sort-energy`` orders the MOs by their Fock
-expectation value -- or, when that data is absent, by CLPO class (bonding,
-antibonding, Rydberg).  The pipeline ``--clpo`` flag exports the CLPOs and
-the energy data that ``--sort-energy`` needs.  See README.md.
+Viewer workflow: the pipeline ``--clpo`` flag writes the spherical
+substrate (``<base>_CLPO_spherical.molden``: JANPA's export with corrected
+markers and spin, kept as the analysis input) and the viewer file
+(``<base>_CLPO.molden``: cartesian, real Fock energies, occupied-first
+order; integer Occup with ``--avogadro`` until the upstream Avogadro
+occupancy bug is fixed).  The standalone ``--to-cart`` / ``--fix-markers``
+/ ``--sort-energy`` / ``--e2`` modes re-process existing files.  See
+README.md.
 """
 
 from __future__ import annotations
@@ -746,7 +749,7 @@ SORT_DE_TOL = 1e-3      # max |E(Fock) - sum_k w eps_k|, Hartree
 LABEL_OCC_TOL = 2e-5    # occupancy agreement when mapping stdout -> file
 
 _EXPORT_SUFFIXES = ("clpo", "lho", "nao", "pnao", "aho", "lpo",
-                    "cart", "fixed")
+                    "cart", "fixed", "spherical")
 _CLASS_RANK = {"BD": 0, "LP": 0, "NB": 1, "RY": 2}
 
 
@@ -765,6 +768,39 @@ def derive_base(stem: str) -> str:
     while len(parts) > 1 and parts[-1].lower() in _EXPORT_SUFFIXES:
         parts.pop()
     return "_".join(parts)
+
+
+def molden_spin_labels(path: Path) -> list[str]:
+    """The 'Spin=' label of every MO block, in file order."""
+    labels: list[str] = []
+    for raw in path.read_text(encoding="utf-8",
+                             errors="replace").splitlines():
+        line = raw.strip()
+        if line.startswith("Spin="):
+            labels.append(line.split("=", 1)[1].strip())
+    return labels
+
+
+def resolve_spin_label(in_path: Path, pure: Path | None = None) -> str | None:
+    """Spin= value to retag a uniform closed-shell set with, or None.
+
+    JANPA writes ``Spin= Beta`` on every orbital even for closed-shell
+    sets; the canonical source (``<base>.PURE`` next to the export, or the
+    given ``pure`` path) carries the calculation's own labeling.  Retag
+    only when both sides are uniform, so open-shell sets are never touched.
+    """
+    labels = set(molden_spin_labels(in_path))
+    if len(labels) != 1:
+        return None
+    if pure is None:
+        pure = in_path.with_name(f"{derive_base(in_path.stem)}.PURE")
+    if not pure.is_file():
+        return None
+    src = set(molden_spin_labels(pure))
+    if len(src) != 1:
+        return None
+    value = src.pop()
+    return value if value != labels.pop() else None
 
 
 def read_matrix_dump(path: Path) -> list[list[float]]:
@@ -1348,6 +1384,25 @@ def pair_interaction_analysis(
     return header, table_rows, totals
 
 
+def _emit_e2(target: Path, pure: Path | None, s_matrix: Path | None,
+             fock_ao: Path | None, out: Path | None = None) -> Path:
+    """Print the pair-interaction report and write the table file."""
+    header, table, totals = pair_interaction_analysis(target, pure, s_matrix,
+                                                      fock_ao)
+    for line in header:
+        print(line)
+    for line in table[:25]:
+        print(line)
+    if len(table) > 25:
+        print(f"      ... ({len(table) - 25} more rows in the file)")
+    print(totals)
+    out = out or target.with_name(target.stem + "_E2.txt")
+    out.write_text("\n".join(header + table + [totals]) + "\n",
+                   encoding="utf-8", newline="\n")
+    print(f"Wrote {out}")
+    return out
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="orca_to_janpa",
@@ -1384,9 +1439,14 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--clpo",
         action="store_true",
-        help="Pipeline mode: export CLPOs plus the viewer-order energy "
-        "artifacts -- <base>_CLPO.molden, <base>.S.txt, <base>.fock_ao.txt "
-        "and the full CLPO label list in <base>.JANPA",
+        help="Pipeline mode: export the CLPO set and the data the "
+        "analysis modes need.  Writes <base>_CLPO_spherical.molden (the "
+        "substrate: JANPA's export with corrected markers/spin, kept as "
+        "the analysis input) and <base>_CLPO.molden (the viewer file: "
+        "cartesian, real energies, occupied-first; integer Occup with "
+        "--avogadro), plus <base>.S.txt, <base>.fock_ao.txt, "
+        "<base>.fock_nao.txt, <base>.clpo2lho.txt, <base>.lho2nao.txt "
+        "and the labels in <base>.JANPA",
     )
     ap.add_argument(
         "--diagnose",
@@ -1414,8 +1474,9 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         metavar="MOLDEN",
-        help="Rewrite [5D]/[7F]/[9G] markers to match shells present "
-        "(JANPA omits [7F], writes spurious [9G])",
+        help="Rewrite [5D]/[7F]/[9G] markers from the actual shells and "
+        "default-fix the spin label (this is also the substrate sanitizer "
+        "used by --clpo)",
     )
     ap.add_argument(
         "--markers-out",
@@ -1427,17 +1488,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--spin",
         choices=("Alpha", "Beta"),
         default=None,
-        help="Retag Spin= lines (JANPA labels closed-shell MOs Beta; "
-        "Avogadro prefers Alpha)",
+        help="Retag Spin= lines (overrides the automatic correction: a "
+        "uniform closed-shell set gets the canonical source's own label)",
     )
     ap.add_argument(
         "--sort-energy",
         action="store_true",
-        help="--to-cart/--fix-markers modifier: write the MOs occupied-"
-        "first then in ascending Fock energy E=<phi|F|phi> (reads the "
-        "<base>.S.txt / <base>.fock_ao.txt dumps and <base>.PURE, all "
-        "written by a '--clpo' janpa run); falls back to CLPO class order "
-        "(BD+LP, NB, RY) from <base>.JANPA when those inputs are missing",
+        help="Standalone --to-cart/--fix-markers modifier (--clpo applies "
+        "this by default): write the MOs occupied-first then in ascending "
+        "Fock energy E=<phi|F|phi> (reads the <base>.S.txt / "
+        "<base>.fock_ao.txt dumps and <base>.PURE from a '--clpo' run); "
+        "falls back to CLPO class order (BD+LP, NB, RY) from <base>.JANPA "
+        "when those inputs are missing",
     )
     ap.add_argument(
         "--pure",
@@ -1462,15 +1524,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument(
         "--e2",
-        type=Path,
+        nargs="?",
+        const="",
         default=None,
-        metavar="CLPO.MOLDEN",
+        metavar="MOLDEN",
         help="Pairwise donor->acceptor interaction table for a JANPA "
         "export: E2 = n_i F_ij^2/(F_jj-F_ii) in kcal/mol (Fock matrix in "
         "the localized basis) plus the charge transfer q = D_ij^2/D_ii "
-        "that JANPA's own CT analysis prints. Reads the --clpo dumps; "
-        "cross-checks against JANPA's printed CT values when the log "
-        "describes the export",
+        "that JANPA's own CT analysis prints.  Pass the file (usually "
+        "<base>_CLPO_spherical.molden), or use bare --e2 with --clpo to "
+        "analyze the export from this run.  Cross-checks JANPA's printed "
+        "CT values when the log describes the export",
     )
     ap.add_argument(
         "--e2-out",
@@ -1481,11 +1545,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--avogadro",
         action="store_true",
-        help="Avogadro-view layout for --to-cart: occupied-first MO order "
-        "plus integer Occup= 2/0 (threshold occ>1.0). Avogadro parses "
-        "Occup as int and fills orbitals positionally, so fractional "
-        "occupations miscount electrons and mislabel virtuals. Implies "
-        "--spin Alpha unless --spin is given.",
+        help="--to-cart/--clpo modifier: write integer Occup= 2/0 "
+        "(threshold occ>1.0) instead of the true fractional occupancies. "
+        "Avogadro parses Occup as int, so fractional occupations miscount "
+        "electrons and mislabel virtuals; this is the workaround until the "
+        "upstream bug is fixed.  The other fix it used to carry (Alpha "
+        "spin) is now the default.",
     )
     return ap
 
@@ -1494,11 +1559,17 @@ def main(argv: list[str] | None = None) -> None:
     ap = build_parser()
     args = ap.parse_args(argv)
 
-    if args.avogadro and args.to_cart is None:
-        ap.error("--avogadro is a --to-cart modifier")
+    e2_inline = args.e2 == ""
+    if e2_inline and not args.clpo:
+        ap.error("--e2 without a file requires --clpo "
+                 "(it analyzes the export from this run)")
+    if args.e2 not in (None, "") and args.clpo:
+        ap.error("--e2 takes no file with --clpo (use bare --e2)")
+    if (args.avogadro and args.to_cart is None and not args.clpo):
+        ap.error("--avogadro applies to --to-cart and --clpo")
     if (args.sort_energy and args.to_cart is None
-            and args.fix_markers is None):
-        ap.error("--sort-energy is a --to-cart/--fix-markers modifier")
+            and args.fix_markers is None and not args.clpo):
+        ap.error("--sort-energy applies to --to-cart/--fix-markers/--clpo")
     if ((args.pure or args.s_matrix or args.fock_ao)
             and not (args.sort_energy or args.e2 is not None)):
         ap.error("--pure/--s-matrix/--fock-ao are --sort-energy/--e2 inputs")
@@ -1506,25 +1577,15 @@ def main(argv: list[str] | None = None) -> None:
     if args.diagnose is not None:
         print(diagnose_nbo_output(args.diagnose))
         return
-    if args.e2 is not None:
-        header, table, totals = pair_interaction_analysis(
-            args.e2, args.pure, args.s_matrix, args.fock_ao)
-        for line in header:
-            print(line)
-        for line in table[:25]:
-            print(line)
-        if len(table) > 25:
-            print(f"      ... ({len(table) - 25} more rows in the file)")
-        print(totals)
-        out = args.e2_out or args.e2.with_name(args.e2.stem + "_E2.txt")
-        out.write_text("\n".join(header + table + [totals]) + "\n",
-                       encoding="utf-8", newline="\n")
-        print(f"Wrote {out}")
+    if args.e2:
+        _emit_e2(Path(args.e2), args.pure, args.s_matrix, args.fock_ao,
+                 args.e2_out)
         return
     if args.to_cart is not None:
         out = args.cart_out or args.to_cart.with_name(
             args.to_cart.stem + "_cart.molden")
-        spin = args.spin or ("Alpha" if args.avogadro else None)
+        spin = (args.spin or resolve_spin_label(args.to_cart)
+                or ("Alpha" if args.avogadro else None))
         sort = None
         if args.sort_energy:
             sort = plan_orbital_order(args.to_cart, args.pure,
@@ -1536,12 +1597,13 @@ def main(argv: list[str] | None = None) -> None:
     if args.fix_markers is not None:
         out = args.markers_out or args.fix_markers.with_name(
             args.fix_markers.stem + "_fixed.molden")
+        spin = args.spin or resolve_spin_label(args.fix_markers)
         sort = None
         if args.sort_energy:
             sort = plan_orbital_order(args.fix_markers, args.pure,
                                       args.s_matrix, args.fock_ao)
             print(sort.report)
-        print(fix_spherical_markers(args.fix_markers, out, args.spin, sort))
+        print(fix_spherical_markers(args.fix_markers, out, spin, sort))
         print(f"Wrote {out}")
         return
     if not args.target:
@@ -1573,8 +1635,9 @@ def main(argv: list[str] | None = None) -> None:
         # builds the Fock matrix from the .PURE orbital energies; the NAO
         # Fock and the LHO transformation chain feed the independent
         # route-B cross-check of --e2 (JANPA wiki "E2_pert" recipe).
+        # janpa writes the substrate; the viewer file is converted from it.
         extra = [
-            "-CLPO_Molden_File", f"{base}_CLPO.molden",
+            "-CLPO_Molden_File", f"{base}_CLPO_spherical.molden",
             "-doFock",
             "-Fock_AO_File", f"{base}.fock_ao.txt",
             "-Fock_NAO_File", f"{base}.fock_nao.txt",
@@ -1591,13 +1654,37 @@ def main(argv: list[str] | None = None) -> None:
             print("      " + line.strip())
     print(f"Done. JANPA output saved to {out_file}")
     if args.clpo:
-        print(f"CLPO export  : {base}_CLPO.molden  (+ {base}.S.txt, "
-              f"{base}.fock_ao.txt, {base}.fock_nao.txt, "
-              f"{base}.clpo2lho.txt, {base}.lho2nao.txt)")
-        print(f"Next         : python {Path(sys.argv[0]).name} --to-cart "
-              f"{base}_CLPO.molden --avogadro --sort-energy")
-        print(f"               python {Path(sys.argv[0]).name} --e2 "
-              f"{base}_CLPO.molden")
+        substrate = workdir / f"{base}_CLPO_spherical.molden"
+        viewer = workdir / f"{base}_CLPO.molden"
+        # Substrate: minimal sanitation only -- markers corrected to match
+        # the actual shells and the spin label corrected from the canonical
+        # source; JANPA's order, Ene placeholders and fractional Occup are
+        # kept.  This is the analysis input (same basis as the dumps).
+        spin = args.spin or resolve_spin_label(substrate,
+                                               workdir / f"{base}.PURE")
+        print("      " + fix_spherical_markers(substrate, substrate, spin))
+        # Viewer file: cartesian, real Fock energies, occupied-first order;
+        # --avogadro adds the integer-Occup workaround for Avogadro's
+        # electron-count bug (kept behind the flag until upstream fixes it).
+        sort = plan_orbital_order(substrate, args.pure, args.s_matrix,
+                                  args.fock_ao)
+        print(sort.report)
+        print("      " + convert_to_cart(
+            substrate, viewer,
+            spin or ("Alpha" if args.avogadro else None),
+            args.avogadro, sort))
+        print(f"Viewer file  : {viewer.name}  (cartesian, real energies, "
+              "occupied-first"
+              + (", integer Occup" if args.avogadro else "") + ")")
+        print(f"Substrate    : {substrate.name}  (spherical -- analysis "
+              "input)")
+        print(f"Data         : {base}.S.txt, {base}.fock_ao.txt, "
+              f"{base}.fock_nao.txt, {base}.clpo2lho.txt, {base}.lho2nao.txt")
+        if e2_inline:
+            _emit_e2(substrate, args.pure, args.s_matrix, args.fock_ao,
+                     workdir / f"{base}_CLPO_E2.txt")
+        print(f"Next         : python {Path(sys.argv[0]).name} --e2 "
+              f"{base}_CLPO_spherical.molden")
 
 
 if __name__ == "__main__":

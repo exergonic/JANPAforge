@@ -1,7 +1,7 @@
-pair-interaction analysis  [tbutyl_CLPO.molden]
+pair-interaction analysis  [tbutyl_CLPO_spherical.molden]
 inputs : tbutyl.S.txt, tbutyl.fock_ao.txt, tbutyl.PURE
 check  : JANPA CT reproduced 9/9 printed pairs (max |dq| 4.8e-06)
-gates  : tbutyl_CLPO.molden orthonormality 9.78e-07 | tbutyl.PURE orthonormality 1.39e-06 | F C - S C eps 2.01e-07 (scale 10.00) | route A vs B 6.62e-07 (max|F| 21.3, basis 1.7e-09)
+gates  : tbutyl_CLPO_spherical.molden orthonormality 9.78e-07 | tbutyl.PURE orthonormality 1.39e-06 | F C - S C eps 2.01e-07 (scale 10.00) | route A vs B 6.62e-07 (max|F| 21.3, basis 1.7e-09)
 note   : E2 = n_i F_ij^2/(F_jj-F_ii) is a perturbation estimate with a well-defined
          meaning in Hartree-Fock; under DFT the 'Fock' operator belongs to the
          auxiliary Kohn-Sham system, so read E2 with care there and prefer the
