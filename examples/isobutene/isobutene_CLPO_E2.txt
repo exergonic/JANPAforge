@@ -2507,4 +2507,4 @@ note   : E2 = n_i F_ij^2/(F_jj-F_ii) is a perturbation estimate with a well-defi
 2494               C2:LP -> H12:RY             -0.000000  12.30627        0.00   0.00000
 2495            C1-C4:BD -> C1:RY              -0.000000   1.82885        0.00   0.00000
 2496               C2:LP -> C4:RY              +0.000000  10.66831        0.00   0.00000
-totals : sum E2 = 168.7 kcal/mol | sum q = 0.21342 e | 16 donors x 156 acceptors = 2496 pairs
+totals : sum q = 0.21342 e | sum E2 = 168.7 kcal/mol over all 2496 pairs (127.3 from the 55 pairs >= 0.5 kcal/mol; a series sum incl. Rydberg couplings, not a molecular property) | 16 donors x 156 acceptors
