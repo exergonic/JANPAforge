@@ -1,49 +1,8 @@
 # orca-to-janpa
 
-ORCA `.gbw` → JANPA pipeline for HF/DFT. **No `.47` file needed.**
+ORCA `.gbw` → JANPA → NBO Visualization Pipeline
 
-## Why you get no `.47` file (the short version)
-
-Nothing is wrong with your inputs. Your `.out` files show the tell-tale
-signature:
-
-```
-Now starting NBO....
-/c/Users/mccan/orca_calcs/NBO
-Stopping NBO...-------
-```
-
-That middle line is the stdout of `pwd` — your `NBOEXE`/`GENEXE` dummy.
-The `NBOEXE=pwd` trick dates to the **ORCA 3.0.x era**, when ORCA wrote
-the `.47` file itself (via its internal `gennbo`) and only needed *some*
-zero-exit program in `NBOEXE` to proceed. The JANPA wiki page you followed
-says exactly that: tested on 3.0.0 / 3.0.2, with the trick documented for
-"post-3.0.0 (but not v4.x)".
-
-Since ORCA 3.1 the `!NPA` / `!NBO` keywords drive the **licensed Weinhold
-NBO6/NBO7 binary**. The ORCA 6.1 manual (§5.2) states `NBOEXE` must be the
-real `nbo7` executable (i4 integer build). A placeholder exits 0, so ORCA
-takes it as success and moves on — writing **no `.47` file and no NBO
-analysis**. That is what you see.
-
-To get a true `.47` from ORCA 6.1.1 you need the NBO license from the
-University of Wisconsin. There is no free knob that re-enables the old
-behavior.
-
-## Good news: for HF/DFT you don't need the `.47` at all
-
-The JANPA wiki's HF/DFT route never touches a `.47`:
-
-1. `orca_2mkl <base> -molden` → `<base>.molden.input` (SCF MOs + basis)
-2. `molden2molden -fromorca3bf -orca3signs` → `<base>.PURE` (conventional Molden)
-3. `janpa -i <base>.PURE` → NPA / CLPO analysis
-
-The `-ds47` option (density from a `.47`) is only for **correlated**
-densities: MP2-relaxed, QCISD/CCSD `orbopt`. And MP2 has its own
-`.47`-free path: run with `%mp2 Density relaxed / NatOrbs true`, then feed
-`orca_2mkl` the resulting `.mp2nos` instead of the `.gbw` (this tool picks
-`.mp2nos` automatically when present). Only CI/CC-orbopt densities truly
-strand you without the NBO license.
+**No `.47` file needed.**
 
 ## Usage (single script, stdlib only — plain `python`, nothing to install)
 
