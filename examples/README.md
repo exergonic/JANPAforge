@@ -45,12 +45,23 @@ python ../../orca_to_janpa.py --to-cart ethene_CLPO_spherical.molden --sort-ener
 
 | example | level of theory | what it demonstrates |
 | --- | --- | --- |
-| `ethene/` | wB97X-D3/def2-TZVP | the reference example: the pi CLPO **is** the canonical HOMO; sigma(C-H) -> sigma*(C-H) hyperconjugation ~5.6 kcal/mol; substrate + viewer pair |
-| `water/` | **HF**/def2-SVP | the Hartree-Fock case (where E(2) is defensible); weak delocalization, table tops out at ~2 kcal/mol |
-| `formaldehyde/` | wB97X-D3/def2-TZVP | lone-pair donor: O n -> sigma*(C-H) ~29 kcal/mol x2 (classic negative hyperconjugation) |
-| `isobutene/` | wB97X-D3/def2-TZVP | sigma(C-H) -> pi*(C=C) hyperconjugation ~5.4 kcal/mol per methyl C-H; vinylic C-H -> sigma*(C-C) ~8.7 |
+| `ethene/` | wB97X-D3/def2-TZVP | the reference example: the pi CLPO **is** the canonical HOMO; sigma(C-H) -> sigma*(C-H) hyperconjugation, q = 0.0080 e (E2 ~5.6 kcal/mol, indicative); substrate + viewer pair |
+| `water/` | **HF**/def2-SVP | the Hartree-Fock case -- the level `VALIDATION.md` checks against NBO 3.1; weak delocalization, table tops out at ~2 kcal/mol (q = 0.0012 e) |
+| `formaldehyde/` | wB97X-D3/def2-TZVP | lone-pair donor: O n -> sigma*(C-H) x2, **q = 0.059 e** each (E2 ~29 kcal/mol, indicative -- and the one channel where CLPO and NBO disagree most; see `../VALIDATION.md`) |
+| `isobutene/` | wB97X-D3/def2-TZVP | sigma(C-H) -> pi*(C=C) hyperconjugation, **q = 0.015 e** per methyl C-H (E2 ~5.4, indicative); vinylic C-H -> sigma*(C-C) E2 ~8.7 |
 | `ethylium/` | wB97X-D3/def2-TZVP | bridged 3c-2e ethyl cation: the E2 table marks the strong interaction with `*` instead of pretending it is a hyperconjugation energy |
-| `tbutyl/` | wB97X-D3/def2-TZVP | carbocation hyperconjugation: 3x C-H -> empty p on C+ ~34 kcal/mol |
+| `tbutyl/` | wB97X-D3/def2-TZVP | carbocation hyperconjugation: 3x C-H -> empty p on C+, **q = 0.084 e** each (E2 ~34 kcal/mol, indicative) |
+
+**Reading the E(2) numbers.** For the wB97X-D3 examples, E2 is
+**indicative**: the Kohn-Sham "Fock" matrix is not the HF Fock (each
+`_E2.txt` header says so), and the robust per-pair quantity there is the
+charge q = D_ij^2/D_ii -- the number JANPA's own CT analysis prints. The
+one channel where the two localization schemes genuinely part ways is
+formaldehyde's O n -> sigma*(C-H): at HF, CLPO gives ~26.5 kcal/mol where
+NBO 3.1 gives 0.85 (different acceptors; the full story is in
+`../VALIDATION.md`). Read the DFT ~29 as CLPO-side and scheme-dependent,
+not as an NBO-grade number. The HF row (water) is the one with a direct
+cross-program check.
 
 Two sanity signals worth knowing: each `_E2.txt` run re-checks JANPA's
 printed CT pairs live (formaldehyde 3/3, isobutene 6/6, tbutyl 9/9 in the
