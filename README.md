@@ -13,10 +13,10 @@ real energies, clean labels, the right electron count.
 [![tested with ORCA 6.1.1](https://img.shields.io/badge/tested_with-ORCA_6.1.1-0b5f8a?style=flat-square)](https://www.faccts.de/orca/)
 [![tested with JANPA 2.02](https://img.shields.io/badge/tested_with-JANPA_2.02-6f42c1?style=flat-square)](http://janpa.sourceforge.net/)
 [![validated vs NBO 3.1](https://img.shields.io/badge/validated_vs-NBO_3.1-brightgreen?style=flat-square)](VALIDATION.md)
-[![no .47 file needed](https://img.shields.io/badge/.47_file-not_needed-blueviolet?style=flat-square)](#quick-start)
+![input: plain SCF .gbw](https://img.shields.io/badge/input-plain%20SCF%20.gbw-blueviolet?style=flat-square)
 [![license: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](LICENSE)
 
-**No correlation `.47` file needed — a plain SCF `.gbw` is enough.**
+**A plain SCF `.gbw` is all it takes — no NPA/NBO keywords, no extra ORCA output.**
 
 </div>
 
@@ -65,12 +65,16 @@ no venv, nothing to install. You bring **ORCA** (for `orca_2mkl`) and the
 python orca_to_janpa.py path/to/molecule --clpo --avogadro --e2
 ```
 
+`--clpo` picks JANPA's NBO-analog localized-orbital set — the one for
+bonding analysis; `--avogadro` applies the viewer fix for Avogadro's
+integer-`Occup` parsing; `--e2` adds the pair-interaction table. (All six
+sets, and what each one is for, are glossed
+[below](#which-janpa-orbital-set).)
+
 Per `<base>`, that is three steps:
 
 - `[1/3]` `orca_2mkl <base> -molden` → `<base>.molden.input`
-  (uses `<base>.mp2nos` via `-anyorbs` when present)
 - `[2/3]` `molden2molden -fromorca3bf -orca3signs` → `<base>.PURE`
-  (add `--dot47 file.47` for the correlated `-ds47` route)
 - `[3/3]` `janpa -i <base>.PURE` → saved as `<base>.JANPA`
 
 …and with the set flags, the files you came for:
