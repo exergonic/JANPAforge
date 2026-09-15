@@ -36,8 +36,9 @@ ORCA SCF `.gbw` the whole way — conversion, JANPA run, and cleanup — and
 writes, for each JANPA orbital set, **exactly two Molden files**: one
 *viewer* file that opens correctly anywhere, and the *spherical substrate*
 kept for further analysis. It also computes the
-**NBO-style E(2) and charge-transfer table** for any set, and it is
-**validated against Gaussian 09's NBO 3.1** ([details](VALIDATION.md)).
+**NBO-style E(2) and charge-transfer table** for any set, and its NPA and
+Wiberg numbers are **validated against Gaussian 09's NBO 3.1** — the E(2)
+comparison is interpretive ([details](VALIDATION.md)).
 
 ```text
 ORCA (.gbw)
@@ -336,6 +337,8 @@ flag).
 - Single file, stdlib only: `orca_to_janpa.py` runs with plain `python`,
   nothing to install, no venv, global Python stays clean.
 - Correctness fixes are on by default — not flags you have to remember.
+  (The `Occup` workaround is the deliberate exception: it serves one
+  specific reader, so it stays opt-in.)
 - Every number the script writes is gated first; on a failed check it
   refuses to write rather than emit plausible-looking values.
 

@@ -46,7 +46,7 @@ python ../../orca_to_janpa.py --to-cart ethene_CLPO_spherical.molden --sort-ener
 | example | level of theory | what it demonstrates |
 | --- | --- | --- |
 | `ethene/` | wB97X-D3/def2-TZVP | the reference example: the pi CLPO **is** the canonical HOMO; sigma(C-H) -> sigma*(C-H) hyperconjugation, q = 0.0080 e (E2 ~5.6 kcal/mol, indicative); substrate + viewer pair |
-| `water/` | **HF**/def2-SVP | the Hartree-Fock case -- the level `VALIDATION.md` checks against NBO 3.1; weak delocalization, table tops out at ~2 kcal/mol (q = 0.0012 e) |
+| `water/` | **HF**/def2-SVP | the Hartree-Fock case -- HF, the regime `VALIDATION.md` uses for its NBO 3.1 comparison (cc-pVDZ in that run, def2-SVP here); weak delocalization, table tops out at ~2 kcal/mol (q = 0.0012 e) |
 | `formaldehyde/` | wB97X-D3/def2-TZVP | lone-pair donor: O n -> sigma*(C-H) x2, **q = 0.059 e** each (E2 ~29 kcal/mol, indicative -- and the one channel where CLPO and NBO disagree most; see `../VALIDATION.md`) |
 | `isobutene/` | wB97X-D3/def2-TZVP | sigma(C-H) -> pi*(C=C) hyperconjugation, **q = 0.015 e** per methyl C-H (E2 ~5.4, indicative); vinylic C-H -> sigma*(C-C) E2 ~8.7 |
 | `ethylium/` | wB97X-D3/def2-TZVP | bridged 3c-2e ethyl cation: the E2 table marks the strong interaction with `*` instead of pretending it is a hyperconjugation energy |
