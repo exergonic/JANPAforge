@@ -74,3 +74,9 @@ original calculation shows no imaginary frequencies, which is the known
 DFT-functional behaviour (bridged = minimum, e.g. JPCA 2002,
 doi 10.1021/jp0215264); wavefunction methods make the classical structure
 the minimum and this one a transition state.
+
+---
+
+Pipeline artifacts in this folder were produced with the JANPA package of
+programs (http://janpa.sourceforge.net/) developed by Tymofii Nikolaienko;
+credit and citation details are in the [top-level README](../README.md#credits).

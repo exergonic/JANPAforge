@@ -342,6 +342,22 @@ flag).
 - Every number the script writes is gated first; on a failed check it
   refuses to write rather than emit plausible-looking values.
 
+## Credits
+
+All NPA/NAO/localization analysis in this workflow is performed by the
+**JANPA package of programs** — install it separately; its jars are not
+bundled here.
+
+This product includes components from JANPA package of programs
+(http://janpa.sourceforge.net/) developed by Tymofii Nikolaienko.
+
+If you publish results produced with this workflow, please cite:
+
+- T. Yu. Nikolaienko, L. A. Bulavin, *Int. J. Quantum Chem.* **119** (2019)
+  e25798 — the LPO/CLPO algorithms.
+- T. Yu. Nikolaienko, L. A. Bulavin, D. M. Hovorun, *Comput. Theor. Chem.*
+  **1050** (2014) 15–22 — the JANPA package.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
