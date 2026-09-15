@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -42,24 +43,29 @@ from operator import mul
 from pathlib import Path
 from typing import NamedTuple
 
-DEFAULT_ORCA_DIR = Path("C:/ORCA_6.1.1")
-DEFAULT_JANPA_DIR = Path("C:/Users/mccan/Code/third-party/JANPA")
+# Install locations.  --orca-dir / --janpa-dir override; the environment
+# variables are the machine-level equivalent.  The JANPA package is just a
+# folder of jars with no conventional path, so its default is the current
+# directory (pass --janpa-dir or set JANPA_DIR to point at it once).
+DEFAULT_ORCA_DIR = Path(os.environ.get("ORCA_DIR", "C:/ORCA_6.1.1"))
+DEFAULT_JANPA_DIR = Path(os.environ.get("JANPA_DIR", "."))
 
 MOLDEN2MOLDEN_JAR = "molden2molden.jar"
 JANPA_JAR = "janpa.jar"
 
 
 def find_orca_2mkl(orca_dir: Path = DEFAULT_ORCA_DIR) -> Path:
-    """Locate orca_2mkl.exe (prefers the given dir, falls back to PATH)."""
-    cand = orca_dir / "orca_2mkl.exe"
-    if cand.is_file():
-        return cand
+    """Locate orca_2mkl (prefers the given dir, falls back to PATH)."""
+    for name in ("orca_2mkl.exe", "orca_2mkl"):
+        cand = orca_dir / name
+        if cand.is_file():
+            return cand
     found = shutil.which("orca_2mkl")
     if found:
         return Path(found)
     raise FileNotFoundError(
-        f"orca_2mkl not found in {orca_dir} nor on PATH. "
-        "Pass --orca-dir C:/ORCA_6.1.1"
+        f"orca_2mkl not found in {orca_dir} nor on PATH. Pass --orca-dir "
+        "(or set ORCA_DIR) to your ORCA install."
     )
 
 
@@ -67,9 +73,13 @@ def find_jars(janpa_dir: Path = DEFAULT_JANPA_DIR) -> tuple[Path, Path]:
     """Return (molden2molden.jar, janpa.jar), raising if missing."""
     m2m = janpa_dir / MOLDEN2MOLDEN_JAR
     jp = janpa_dir / JANPA_JAR
-    missing = [str(p) for p in (m2m, jp) if not p.is_file()]
+    missing = [p.name for p in (m2m, jp) if not p.is_file()]
     if missing:
-        raise FileNotFoundError(f"JANPA jar(s) missing: {missing}")
+        raise FileNotFoundError(
+            f"missing from {janpa_dir.resolve()}: {', '.join(missing)}. "
+            "Point --janpa-dir (or set JANPA_DIR) at the folder holding "
+            "both jars from the JANPA package."
+        )
     return m2m, jp
 
 
@@ -467,7 +477,9 @@ def convert_to_cart(in_path: Path, out_path: Path,
     """
     shell_ls = molden_shell_ls(in_path)
     if "g" in shell_ls:
-        raise NotImplementedError("g shells not implemented for --to-cart")
+        raise NotImplementedError(
+            "g shells are not implemented for --to-cart; the spherical file "
+            "(--fix-markers output) is the artifact for this molecule")
     expect = sum(SPHER_N[L] for L in shell_ls)
     before, blocks, after = split_molden_mo_section(in_path)
     worst_dc = 0.0
@@ -1395,13 +1407,17 @@ def pair_interaction_analysis(
             + (" *" if strong else ""))
 
     sum_e2 = sum(r[0] for r in rows if r[0] is not None)
+    sum_big = sum(r[0] for r in rows if r[0] is not None and r[0] >= 0.5)
+    n_big = sum(1 for r in rows if r[0] is not None and r[0] >= 0.5)
     sum_q = sum(r[1] for r in rows)
     n_strong = sum(1 for r in rows if r[6])
     n_don = sum(1 for o in occ_tgt if o > 1.0)
     n_acc = len(occ_tgt) - n_don
-    totals = (f"totals : sum E2 = {sum_e2:.1f} kcal/mol | "
-              f"sum q = {sum_q:.5f} e | {n_don} donors x {n_acc} acceptors "
-              f"= {len(rows)} pairs"
+    totals = (f"totals : sum q = {sum_q:.5f} e | "
+              f"sum E2 = {sum_e2:.1f} kcal/mol over all {len(rows)} pairs "
+              f"({sum_big:.1f} from the {n_big} pairs >= 0.5 kcal/mol; a "
+              f"series sum incl. Rydberg couplings, not a molecular "
+              f"property) | {n_don} donors x {n_acc} acceptors"
               + (f" | {n_strong} strongly mixed (*)" if n_strong else "")
               + (f" | {n_skip} skipped: dE <= 0" if n_skip else ""))
 
@@ -1466,8 +1482,12 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         help="Basename or path to .gbw/.mp2nos/.inp (e.g. ethene_NBO)",
     )
-    ap.add_argument("--orca-dir", type=Path, default=DEFAULT_ORCA_DIR)
-    ap.add_argument("--janpa-dir", type=Path, default=DEFAULT_JANPA_DIR)
+    ap.add_argument("--orca-dir", type=Path, default=DEFAULT_ORCA_DIR,
+                    help="folder containing orca_2mkl "
+                         f"(default: {DEFAULT_ORCA_DIR})")
+    ap.add_argument("--janpa-dir", type=Path, default=DEFAULT_JANPA_DIR,
+                    help=f"folder containing {JANPA_JAR} and "
+                         f"{MOLDEN2MOLDEN_JAR} (default: {DEFAULT_JANPA_DIR})")
     ap.add_argument(
         "--dot47",
         type=Path,
@@ -1782,4 +1802,7 @@ def main(argv: list[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (FileNotFoundError, NotImplementedError) as e:
+        sys.exit(f"error: {e}")
