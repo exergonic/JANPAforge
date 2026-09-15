@@ -13,7 +13,7 @@ real energies, clean labels, the right electron count.
 [![tested with ORCA 6.1.1](https://img.shields.io/badge/tested_with-ORCA_6.1.1-0b5f8a?style=flat-square)](https://www.faccts.de/orca/)
 [![tested with JANPA 2.02](https://img.shields.io/badge/tested_with-JANPA_2.02-6f42c1?style=flat-square)](http://janpa.sourceforge.net/)
 [![validated vs NBO 3.1](https://img.shields.io/badge/validated_vs-NBO_3.1-brightgreen?style=flat-square)](VALIDATION.md)
-![input: plain SCF .gbw](https://img.shields.io/badge/input-plain%20SCF%20.gbw-blueviolet?style=flat-square)
+[![no .47 file needed](https://img.shields.io/badge/.47_file-not_needed-blueviolet?style=flat-square)](#quick-start)
 [![license: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](LICENSE)
 
 **A plain SCF `.gbw` is all it takes — no NPA/NBO keywords, no extra ORCA output.**
