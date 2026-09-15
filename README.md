@@ -1,49 +1,104 @@
-# orca-to-janpa
+<div align="center">
 
-ORCA `.gbw` → JANPA → NBO Visualization Pipeline
+# JANPAforge
 
-**No `.47` file needed.**
+**Localized orbitals out of ORCA that actually open.**
 
-## Usage (single script, stdlib only — plain `python`, nothing to install)
+`.gbw` → Molden → JANPA → Molden files your viewer can trust:
+real energies, clean labels, the right electron count.
 
-```powershell
-cd C:/Users/mccan/Code/orca-to-janpa
-python orca_to_janpa.py C:/Users/mccan/orca_calcs/NBO/ethene_NBO
-python orca_to_janpa.py --diagnose C:/Users/mccan/orca_calcs/NBO/ethene_NBO.out
+[![python](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![dependencies](https://img.shields.io/badge/dependencies-0-success?style=flat-square)](#project-rules)
+![output: Molden](https://img.shields.io/badge/output-Molden-e36209?style=flat-square)
+[![tested with ORCA 6.1.1](https://img.shields.io/badge/tested_with-ORCA_6.1.1-0b5f8a?style=flat-square)](https://www.faccts.de/orca/)
+[![tested with JANPA 2.02](https://img.shields.io/badge/tested_with-JANPA_2.02-6f42c1?style=flat-square)](http://janpa.sourceforge.net/)
+[![validated vs NBO 3.1](https://img.shields.io/badge/validated_vs-NBO_3.1-brightgreen?style=flat-square)](VALIDATION.md)
+[![no .47 file needed](https://img.shields.io/badge/.47_file-not_needed-blueviolet?style=flat-square)](#quick-start)
+[![license: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](LICENSE)
+
+**No correlation `.47` file needed — a plain SCF `.gbw` is enough.**
+
+</div>
+
+## What it does
+
+[JANPA](http://janpa.sourceforge.net/) gives you the free, open-source route to
+Lewis-like localized orbitals — NBO-style bonding analysis without the license.
+But its raw export fights every viewer: spherical d/f coefficients, broken
+`[5D]/[7F]/[9G]` marker lines, a sometimes-wrong `Spin=`, `Ene=` values that are
+really just 0, 1, 2…, orbitals in JANPA's internal order, and fractional
+`Occup` values that Avogadro reads as integers.
+
+**JANPAforge** is the single-file script `orca_to_janpa.py`: it takes a plain
+ORCA SCF `.gbw` the whole way — conversion, JANPA run, and cleanup — and
+writes, for each JANPA orbital set, **exactly two Molden files**: one
+*viewer* file that opens correctly anywhere, and the *spherical substrate*
+kept for further analysis. It also computes the
+**NBO-style E(2) and charge-transfer table** for any set, and it is
+**validated against Gaussian 09's NBO 3.1** ([details](VALIDATION.md)).
+
+```text
+ORCA (.gbw)
+   │  orca_2mkl
+   ▼
+.molden.input
+   │  molden2molden
+   ▼
+.PURE
+   │  janpa
+   ▼
+JANPA localized orbitals   (CLPO · LHO · AHO · LPO · NAO · PNAO)
+   │  orca_to_janpa.py --clpo --avogadro --e2
+   ▼
+<base>_CLPO.molden              ← open this one in your viewer
+<base>_CLPO_spherical.molden    ← the analysis input (--e2, --sort-energy, JANPA)
+<base>_CLPO_E2.txt              ← pair interactions: E2 (kcal/mol) + charge transfer (e)
 ```
 
-What it does per `<base>`:
+## Quick start
 
-- `[1/3]` runs `C:/ORCA_6.1.1/orca_2mkl.exe <base> -molden`
+Everything the script itself needs is already in your Python: no packages,
+no venv, nothing to install. You bring **ORCA** (for `orca_2mkl`) and the
+**JANPA package** (`janpa.jar` + `molden2molden.jar` side by side).
+
+```bash
+python orca_to_janpa.py path/to/molecule --clpo --avogadro --e2
+```
+
+Per `<base>`, that is three steps:
+
+- `[1/3]` `orca_2mkl <base> -molden` → `<base>.molden.input`
   (uses `<base>.mp2nos` via `-anyorbs` when present)
-- `[2/3]` runs `molden2molden -fromorca3bf -orca3signs` → `<base>.PURE`
+- `[2/3]` `molden2molden -fromorca3bf -orca3signs` → `<base>.PURE`
   (add `--dot47 file.47` for the correlated `-ds47` route)
-- `[3/3]` runs `janpa -i <base>.PURE`, saves `<base>.JANPA`
+- `[3/3]` `janpa -i <base>.PURE` → saved as `<base>.JANPA`
 
-Add one set flag per JANPA orbital set to also export its viewer file, its
-retained spherical substrate, and the data the analysis modes need (see
-"Viewing orbitals" and "Orbital-interaction analysis"):
+…and with the set flags, the files you came for:
 
-```powershell
-python orca_to_janpa.py ethene --clpo --lho --nao --avogadro --e2
-# (--all-sets is shorthand for all six: clpo, lho, aho, lpo, nao, pnao)
-# -> ethene_<SET>.molden            the viewer file: cartesian d/f,
-#                                   corrected Spin=, real energies,
-#                                   occupied-first; integer Occup with
-#                                   --avogadro (the Avogadro workaround)
-# -> ethene_<SET>_spherical.molden  the substrate: JANPA's export with
-#                                   corrected markers/Spin (analysis input)
-# -> ethene.S.txt, ethene.fock_ao.txt, ethene.fock_nao.txt and the
-#    transformation chains of the requested sets    (janpa dumps)
-# -> ethene_<SET>_E2.txt            with --e2: the pair-interaction table
-#    and the full CLPO labels in ethene.JANPA
+```text
+<base>_<SET>.molden            the viewer file: cartesian d/f, markers clean,
+                               Spin= corrected, real Fock energies, occupied-
+                               first order; integer Occup with --avogadro
+<base>_<SET>_spherical.molden  the substrate: JANPA's export with the two
+                               corrected labels; the analysis input
+<base>.S.txt, <base>.fock_ao.txt, <base>.fock_nao.txt
+                               plus the transformation chains of the
+                               requested sets — the janpa dumps
+<base>_<SET>_E2.txt            with --e2: pair-interaction table
+                               and full CLPO labels in <base>.JANPA
 ```
 
-Extra flags after `--` are passed to `janpa.jar`, e.g.:
+One set flag per set — `--clpo`, `--lho`, `--aho`, `--lpo`, `--nao`,
+`--pnao` — or `--all-sets` for all six at once. Extra flags after `--` are
+passed straight to `janpa.jar`:
 
-```powershell
-python orca_to_janpa.py ethene_NBO -- --npacharges charges.txt
+```bash
+python orca_to_janpa.py molecule -- --npacharges charges.txt
 ```
+
+Defaults expect ORCA at `C:/ORCA_6.1.1` and the JANPA jars in one folder;
+`--orca-dir` / `--janpa-dir` point elsewhere. Checking an ORCA output by
+hand: `python orca_to_janpa.py --diagnose molecule.out`.
 
 ## Verified
 
@@ -53,14 +108,38 @@ charge sum 0.00000, CLPO C=C / C–H bonding graph correct. No `NPA`/`NBO`
 keyword needed in the ORCA input for this route — a plain SCF `.gbw`
 suffices.
 
+## Examples
+
+`examples/` carries six molecules through the whole pipeline — every file
+in place and self-contained, so the viewer and analysis modes rerun
+in-folder **without ORCA**:
+
+```bash
+cd examples/ethene
+python ../../orca_to_janpa.py --to-cart ethene_CLPO_spherical.molden --sort-energy --avogadro
+python ../../orca_to_janpa.py --e2 ethene_CLPO_spherical.molden
+```
+
+See [examples/README.md](examples/README.md) for what each molecule shows —
+hyperconjugation in isobutene, the bridged ethyl cation's `*` flag,
+carbocation σ(C–H)→empty-p, and more.
+
+## Validation
+
+Cross-checked against Gaussian 09's NBO 3.1 on HF/cc-pVDZ for water,
+formaldehyde, and isobutene: populations agree within 0.004 e, Wiberg bond
+indices within 0.004, orbital occupancies within 6e-4, and isobutene's
+hyperconjugation channels within 3 % — with one honest divergence
+documented. The full record, plus `validation/compare.py` and the raw
+evidence, is in [VALIDATION.md](VALIDATION.md).
+
 ## Viewing orbitals (both fixes are on by default)
 
 Raw JANPA exports have two universal defects — spherical d/f coefficients
 (Avogadro renders cartesian only) and wrong marker lines (JANPA omits
 `[7F]` and writes a spurious `[9G]`, which mistracks f shells in readers
 that honor markers). Both fixes are applied **by default** by the pipeline.
-Every set flag (`--clpo`, `--lho`, `--aho`, `--lpo`, `--nao`, `--pnao`, or
-`--all-sets`) writes exactly two Molden files for its set:
+Every set flag writes exactly two Molden files for its set:
 
 - `<base>_<SET>.molden` — **the viewer file**: cartesian d/f, markers
   clean, `Spin=` corrected from the canonical source, real Fock energies,
@@ -69,8 +148,8 @@ Every set flag (`--clpo`, `--lho`, `--aho`, `--lpo`, `--nao`, `--pnao`, or
   very same file instead gets integer `Occup= 2/0`, because Avogadro
   parses `Occup` as int (1.986 → 1, miscounting 16 electrons as 8) and
   fills orbitals positionally, so fractional occupations mislabel
-  occupied/virtual. Same filename either way — drop the flag when the
-  upstream bug is fixed.
+  occupied/virtual ([upstream issue #3005](https://github.com/OpenChemistry/avogadrolibs/issues/3005)).
+  Same filename either way — drop the flag when the upstream bug is fixed.
 - `<base>_<SET>_spherical.molden` — the **analysis substrate**: JANPA's
   export with only the two corrected labels (markers, `Spin=`); JANPA's
   order, sequential `Ene=` values and fractional `Occup` stay exactly as
@@ -188,9 +267,9 @@ table only describes the CLPO set, so the printed-pair cross-check and
 the labels apply there; other sets verify through the route-B chain and
 report "labels/CT check skipped".
 
-Numbers from this folder (wB97X-D3/def2-TZVP): isobutene sigma(C-H) ->
-pi*(C=C) ~5 kcal/mol per methyl C-H; formaldehyde O lone pair ->
-sigma*(C-H) ~29 kcal/mol; tert-butyl cation sigma(C-H) -> empty-p
+Numbers from the examples folder (wB97X-D3/def2-TZVP): isobutene
+sigma(C-H) -> pi*(C=C) ~5 kcal/mol per methyl C-H; formaldehyde O lone
+pair -> sigma*(C-H) ~29 kcal/mol; tert-butyl cation sigma(C-H) -> empty-p
 ~34 kcal/mol x3; water (HF) tops out at ~2 kcal/mol.
 
 ### Which JANPA orbital set (all work with the viewer/analysis modes)
@@ -229,3 +308,10 @@ flag).
 
 - Single file, stdlib only: `orca_to_janpa.py` runs with plain `python`,
   nothing to install, no venv, global Python stays clean.
+- Correctness fixes are on by default — not flags you have to remember.
+- Every number the script writes is gated first; on a failed check it
+  refuses to write rather than emit plausible-looking values.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
