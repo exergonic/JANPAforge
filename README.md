@@ -2,7 +2,7 @@
 
 # JANPAforge
 
-**Localized orbitals out of ORCA that actually open.**
+**Localized orbitals out of JANPA that actually open.**
 
 One stdlib-only script: `orca_to_janpa.py`.
 
