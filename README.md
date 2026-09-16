@@ -298,20 +298,32 @@ above:
   charges, Wiberg bond indices, angular-momentum populations
   (`-NAO_Molden_File`, Fock: `<base>.fock_nao.txt`; its `--e2` route-B
   check compares the F_NAO dump directly).
+  Use when the question is NPA charges, Wiberg bond indices, or angular-momentum populations.
 - **PNAO** — pre-orthogonalization NAOs; NAO-construction intermediate.
   Normalized but mutually non-orthogonal by construction: viewer +
   substrate with the energy sort, but no pair analysis (see "Viewing
   orbitals").
+  Use when the question is the NAO-construction intermediate before orthogonalization.
 - **LHO** (localized hybrid orbitals) — the atom-centred hybrids the CLPOs
   are built from (`-LHO_Molden_File`; `<base>.lho2nao.txt` = LHOs in the
   NAO basis).
-- **AHO / LPO** — the LPO family (Int J Quantum Chem 2019, e25798);
+  Use when the question is the atom-centred hybrids before Lewis pairing.
+- **AHO / LPO** (atomic hybrid orbitals / localized property-optimized
+  orbitals) — the LPO family (Int J Quantum Chem 2019, e25798);
   property-optimized localized orbitals and their atomic hybrids
   (`-AHO2NAO_File`, `-LPO2AHO_File` = their transformation chains).
-- **CLPO** ("chemist's LPO") — the NBO-analog Lewis-like set (BD/NB/LP/RY);
+  Use when the question is a one-electron property partitioned into atom and pair terms, not the Lewis bonding graph.
+- **CLPO** (chemist's localized property-optimized orbitals) — the NBO-analog Lewis-like set (BD/NB/LP/RY);
   the one to use for bonding analysis, orbital visualization and the full
   `--e2` treatment (CLPO labels and the printed CT table live in
   `<base>.JANPA`).
+  Use when the question is the bonding graph, E(2) / charge-transfer pairs, or orbital visualization.
+
+If a homework prompt said “NBO” and that is new to you, start at
+[STUDENTS.md](STUDENTS.md).
+
+See [REVIEW.md](REVIEW.md) for why these sets differ and when
+each is the right choice.
 
 The naive approach of just running `janpa` and reading the files also
 needs: the janpa stdout (`<base>.JANPA`) for labels, and a `-doFock` run
@@ -355,6 +367,8 @@ If you publish results produced with this workflow, please cite:
 
 - T. Yu. Nikolaienko, L. A. Bulavin, *Int. J. Quantum Chem.* **119** (2019)
   e25798 — the LPO/CLPO algorithms.
+- T. Yu. Nikolaienko, *Phys. Chem. Chem. Phys.* **21** (2019) 5285–5294 —
+  why LPO is not the Lewis set (and CLPO vs NBO occupancy).
 - T. Yu. Nikolaienko, L. A. Bulavin, D. M. Hovorun, *Comput. Theor. Chem.*
   **1050** (2014) 15–22 — the JANPA package.
 
