@@ -39,9 +39,9 @@ RE_G09_OCC = re.compile(r"^\s*(\d+)\.\s+(CR|BD|LP)\s+\(\s*\d+\)\s+"
                         r"(.*?)\s{2,}(\d+\.\d+)")
 # Pipeline atom labels are element+index with no separator: C1, H11.
 RE_PIPE_LABEL = re.compile(r"^[A-Za-z]+\d+$")
-# Pipeline E(2) row: # donor -> acceptor   F_ij  dE  E2  q; only E2 is used.
+# Pipeline pair row: # donor -> acceptor   F_ij  dE  q  E2; only E2 is used.
 RE_PIPE_E2 = re.compile(r"^\s*\d+\s+(\S+)\s+->\s+(\S+)\s+-?[\d.]+\s+"
-                        r"[\d.]+\s+([\d.]+)\s+[\d.]+\s*$")
+                        r"[\d.]+\s+[\d.]+\s+([\d.]+)\s*$")
 
 
 def read_g09(path):
@@ -210,9 +210,10 @@ def main():
               f"not ranked) --")
         for donor, acceptor, e2 in g09["e2"][:12]:
             print(f"   {e2:6.2f}  {donor} -> {acceptor}")
-        print(f"-- E(2), pipeline (top 12 of "
-              f"{sum(1 for r in pipeline['e2'] if r[2] >= 0.5)} rows "
-              f">= 0.5) --")
+        print(f"-- E(2), pipeline (first 12 table rows, NB-acceptor "
+              f"block first; "
+              f"{sum(1 for r in pipeline['e2'] if r[2] >= 0.5)} pairs "
+              f">= 0.5 kcal/mol) --")
         for donor, acceptor, e2 in pipeline["e2"][:12]:
             print(f"   {e2:6.2f}  {donor} -> {acceptor}")
         print(f"   {pipeline['e2_totals']}")

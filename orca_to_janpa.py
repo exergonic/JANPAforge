@@ -1429,7 +1429,7 @@ def pair_interaction_analysis(
         e2s = f"{e2:11.2f}" if e2 is not None else "          -"
         table_rows.append(
             f"{k:>4}  {name(i):>18} -> {name(j):<18} "
-            f"{fij:+.6f} {de:9.5f} {e2s} {q:9.5f}"
+            f"{fij:+.6f} {de:9.5f} {q:9.5f} {e2s}"
             + (" *" if strong else ""))
 
     sum_e2 = sum(r[0] for r in rows if r[0] is not None)
@@ -1466,22 +1466,28 @@ def pair_interaction_analysis(
         f"inputs : {s_matrix.name}, {fock_ao.name}, {pure.name}",
         f"check  : {ct_note}",
         checks,
-        "note   : E2 = n_i F_ij^2/(F_jj-F_ii) is a perturbation estimate "
-        "with a well-defined",
-        "         meaning in Hartree-Fock; under DFT the 'Fock' operator "
-        "belongs to the",
-        "         auxiliary Kohn-Sham system, so read E2 with care there "
-        "and prefer the",
-        "         charge q = D_ij^2/D_ii (the quantity JANPA's CT analysis "
-        "prints; see its",
-        "         wiki page 'E2_pert' and Nikolaienko et al., J. Comput. "
-        "Chem. 39 (2018) 1090).",
+        "note   : q = D_ij^2/D_ii is the charge transferred between the "
+        "two orbitals:",
+        "         the primary number -- it reads like a population "
+        "(electrons moved)",
+        "         and keeps its meaning under DFT. E2 = n_i "
+        "F_ij^2/(F_jj-F_ii) is the",
+        "         companion perturbation estimate, well-defined in "
+        "Hartree-Fock; under",
+        "         DFT the 'Fock' operator belongs to the auxiliary "
+        "Kohn-Sham system,",
+        "         so read E2 with care there and quote q. (JANPA's CT "
+        "table prints",
+        "         the same q; see its wiki page 'E2_pert' and "
+        "Nikolaienko et al.,",
+        "         J. Comput. Chem. 39 (2018) 1090.)",
         f"         rows marked * have |F_ij|/(F_jj-F_ii) >= "
-        f"{E2_STRONG_RATIO}: the two orbitals are strongly mixed, the "
-        "second-order",
-        "         estimate is not meaningful for them (often a sign the "
-        "Lewis-like",
-        "         reference itself is inadequate -- e.g. 3c-2e bonding).",
+        f"{E2_STRONG_RATIO}: the two orbitals are",
+        "         strongly mixed, the second-order estimate is not "
+        "meaningful for them",
+        "         (often a sign the Lewis-like reference itself is "
+        "inadequate -- e.g.",
+        "         3c-2e bonding).",
     ]
     if labels:
         header += [
@@ -1497,7 +1503,7 @@ def pair_interaction_analysis(
         ]
     header.append(
         f"{'#':>4}  {'donor':>18} -> {'acceptor':<18} {'F_ij':>9} "
-        f"{'dE/Ha':>9} {'E2(kcal/mol)':>11} {'q(e)':>9}")
+        f"{'dE/Ha':>9} {'q(e)':>9} {'E2(kcal/mol)':>11}")
     return header, table_rows, totals
 
 
@@ -1670,9 +1676,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="MOLDEN",
         help="Pairwise donor->acceptor interaction table for a JANPA "
-        "export: E2 = n_i F_ij^2/(F_jj-F_ii) in kcal/mol (Fock matrix in "
-        "the localized basis) plus the charge transfer q = D_ij^2/D_ii "
-        "that JANPA's own CT analysis prints.  Pass the file (usually "
+        "export: the charge transfer q = D_ij^2/D_ii (the number JANPA's "
+        "own CT analysis prints; the one to quote) plus the companion "
+        "estimate E2 = n_i F_ij^2/(F_jj-F_ii) in kcal/mol (Fock matrix "
+        "in the localized basis).  Pass the file (usually "
         "<base>_CLPO_spherical.molden), or use bare --e2 with a set flag "
         "to analyze the export from this run.  Cross-checks JANPA's "
         "printed CT values when the log describes the export",

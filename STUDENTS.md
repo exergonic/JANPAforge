@@ -65,7 +65,7 @@ for a charge table.
 You do not need six flags. You need `--clpo`. Add `--nao` if the
 homework asked for charges.
 
-`--pnao`, `--lho`, `--aho`, `--lpo`, and the E(2) pair table are real.
+`--pnao`, `--lho`, `--aho`, `--lpo`, and the pair-interaction table are real.
 They are also not this assignment. If the prompt did not name them,
 skip them. [REVIEW.md](REVIEW.md) is the next page, not this one.
 

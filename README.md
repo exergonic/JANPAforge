@@ -56,7 +56,7 @@ JANPA localized orbitals   (CLPO · LHO · AHO · LPO · NAO · PNAO)
    ▼
 <base>_CLPO.molden              ← open this one in your viewer
 <base>_CLPO_spherical.molden    ← the analysis input (--e2, --sort-energy, JANPA)
-<base>_CLPO_E2.txt              ← pair interactions: E2 (kcal/mol) + charge transfer (e)
+<base>_CLPO_E2.txt              ← pair interactions: charge transfer (e) + E2 (kcal/mol)
 ```
 
 ## Quick start
@@ -264,15 +264,18 @@ of any JANPA export and writes `<stem>_E2.txt`:
     python orca_to_janpa.py --e2 ethene_CLPO_spherical.molden
     # or in one shot: python orca_to_janpa.py ethene --clpo --e2
 
-- `E2 = n_i F_ij^2/(F_jj - F_ii)` [kcal/mol] — the NBO-style second-order
-  perturbation estimate in the localized basis. Read it with the caveat
-  printed in the report: well-defined for HF, indicative for DFT (prefer
-  `q` there).
-- `q = D_ij^2/D_ii` [e] — the charge transferred between the two orbitals.
-  This is exactly the number JANPA prints in its "Approximate charge
-  transfer analysis"; `--e2` reproduces every printed pair (checked at run
-  time whenever the log describes the export) and shows the pairs below
-  JANPA's print threshold.
+- `q = D_ij^2/D_ii` [e] — the charge transferred between the two orbitals:
+  the primary number. It reads like a population — electrons that left the
+  donor for the acceptor — so it needs no energy-scale intuition, and it
+  keeps its meaning under DFT. This is exactly the number JANPA prints in
+  its "Approximate charge transfer analysis"; `--e2` reproduces every
+  printed pair (checked at run time whenever the log describes the export)
+  and shows the pairs below JANPA's print threshold.
+- `E2 = n_i F_ij^2/(F_jj - F_ii)` [kcal/mol] — the companion second-order
+  estimate in the localized basis. The two numbers answer different
+  questions — how much charge moves vs how strong the coupling is
+  estimated to be — so quote `q`, and read E2 with the caveat printed in
+  the report: well-defined for HF, indicative for DFT.
 - Rows marked `*` have |F_ij|/(F_jj-F_ii) >= 0.25: the two orbitals are
   strongly mixed and the second-order estimate is not meaningful for them
   (often a sign the Lewis-like reference itself is inadequate — e.g. the
@@ -297,14 +300,14 @@ table only describes the CLPO set, so the printed-pair cross-check and
 the labels apply there; other sets verify through the route-B chain and
 report "labels/CT check skipped".
 
-Numbers from the examples folder (wB97X-D3/def2-TZVP, so E2 is
-**indicative** there — prefer `q`): isobutene sigma(C-H) -> pi*(C=C) ~5
-kcal/mol per methyl C-H (q = 0.015 e); formaldehyde O lone pair ->
-sigma*(C-H) ~29 kcal/mol (q = 0.059 e; this is the one channel where
-CLPO and NBO genuinely diverge -- see [VALIDATION.md](VALIDATION.md));
-tert-butyl cation sigma(C-H) -> empty-p ~34 kcal/mol x3 (q = 0.084 e);
-water (HF, where E2 is directly meaningful) tops out at ~2 kcal/mol
-(q = 0.0012 e).
+Numbers from the examples folder (wB97X-D3/def2-TZVP, where `q` is the
+one to quote — E2 is **indicative**): isobutene, each methyl C–H leaks
+q = 0.015 e into pi*(C=C) (E2 ~5 kcal/mol); formaldehyde, the O lone
+pair transfers q = 0.059 e into sigma*(C-H) (E2 ~29 kcal/mol — the one
+channel where CLPO and NBO genuinely diverge; see
+[VALIDATION.md](VALIDATION.md)); tert-butyl cation, q = 0.084 e per C-H
+into the empty p (E2 ~34 kcal/mol x3); water (HF, where E2 is directly
+meaningful) tops out at q = 0.0012 e (~2 kcal/mol).
 
 ### Which JANPA orbital set (all work with the viewer/analysis modes)
 
@@ -335,7 +338,7 @@ above:
   the one to use for bonding analysis, orbital visualization and the full
   `--e2` treatment (CLPO labels and the printed CT table live in
   `<base>.JANPA`).
-  Use when the question is the bonding graph, E(2) / charge-transfer pairs, or orbital visualization.
+  Use when the question is the bonding graph, charge-transfer (q) / E(2) pairs, or orbital visualization.
 
 If a homework prompt said “NBO” and that is new to you, start at
 [STUDENTS.md](STUDENTS.md).

@@ -47,20 +47,20 @@ E(RHF)  G09 -76.0250404980   pipeline -76.0250404875   delta 1.05e-08 Ha
      0.87  LP (   1) O   1 -> RY*(   3) H   3
      2.33  LP (   2) O   1 -> RY*(   1) H   2
      2.33  LP (   2) O   1 -> RY*(   1) H   3
--- E(2), pipeline (top 12 of 5 rows >= 0.5) --
+-- E(2), pipeline (first 12 table rows, NB-acceptor block first; 5 pairs >= 0.5 kcal/mol) --
+     0.24  O1-H3:BD -> O1-H2:NB
+     0.00  O1-H3:BD -> O1-H3:NB
      2.00  O1:LP -> H3:RY
      2.00  O1:LP -> H2:RY
      1.32  O1:LP -> H2:RY
      1.32  O1:LP -> H3:RY
      0.76  O1-H2:BD -> H3:RY
-     0.24  O1-H3:BD -> O1-H2:NB
      0.18  O1-H3:BD -> H2:RY
      0.13  O1:LP -> H2:RY
      0.11  O1:LP -> H2:RY
      0.07  O1-H2:BD -> H3:RY
      0.05  O1:LP -> H3:RY
-     0.05  O1:LP -> O1:RY
-   totals : sum q = 0.00697 e | sum E2 = 9.6 kcal/mol over all 95 pairs (7.4 from the 5 pairs >= 0.5 kcal/mol; a series sum incl. Rydberg couplings, not a molecular property) | 5 donors x 19 acceptors
+   totals : sum q = 0.00697 e | sum E2 = 9.6 kcal/mol over all 95 pairs (7.4 from the 5 pairs >= 0.5 kcal/mol; a series sum incl. Rydberg couplings, not a molecular property) | 5 donors x 19 acceptors | rows: 10 NB-acceptor / 85 RY-acceptor | blocks: 1..10 NB, 11..95 RY (RY rows: 9.1 kcal/mol of the E2 series, 0.00623 e of the q sum)
 
 ========================================================================
 FORMALDEHYDE  (HF/cc-pVDZ, fixed geometry)
@@ -119,20 +119,20 @@ E(RHF)  G09 -113.8768187500   pipeline -113.8768187387   delta 1.13e-08 Ha
      0.85  LP (   1) O   2 -> BD*(   1) C   1 - H   4
      4.90  LP (   2) O   2 -> RY*(   2) C   1
      0.76  LP (   2) O   2 -> RY*(   7) O   2
--- E(2), pipeline (top 12 of 7 rows >= 0.5) --
+-- E(2), pipeline (first 12 table rows, NB-acceptor block first; 7 pairs >= 0.5 kcal/mol) --
     26.49  O2:LP -> C1-H3:NB
-    15.90  O2:LP -> C1:RY
-     2.19  C1-H4:BD -> O2:RY
-     2.19  C1-H3:BD -> O2:RY
      1.20  C1-H3:BD -> C1-H4:NB
-     1.10  C1-O2:BD -> C1:RY
-     0.71  C1:LP -> O2:RY
-     0.48  O2:LP -> O2:RY
-     0.35  O2:LP -> H3:RY
      0.19  C1-H3:BD -> C1-H3:NB
-     0.18  O2:LP -> C1:RY
      0.15  O2:LP -> C1-H3:NB
-   totals : sum q = 0.11557 e | sum E2 = 95.2 kcal/mol over all 240 pairs (89.9 from the 14 pairs >= 0.5 kcal/mol; a series sum incl. Rydberg couplings, not a molecular property) | 8 donors x 30 acceptors
+     0.15  O2:LP -> C1-H4:NB
+     0.01  C1-H3:BD -> C1-O2:NB
+     0.00  C1-O2:BD -> C1-O2:NB
+     0.00  C1-O2:BD -> C1-O2:NB
+     0.00  O2:LP -> C1-O2:NB
+     0.00  O2:LP -> C1-O2:NB
+     0.00  C1-H4:BD -> C1-O2:NB
+     0.00  C1:LP -> C1-O2:NB
+   totals : sum q = 0.11557 e | sum E2 = 95.2 kcal/mol over all 240 pairs (89.9 from the 14 pairs >= 0.5 kcal/mol; a series sum incl. Rydberg couplings, not a molecular property) | 8 donors x 30 acceptors | rows: 32 NB-acceptor / 208 RY-acceptor | blocks: 1..32 NB, 33..240 RY (RY rows: 37.0 kcal/mol of the E2 series, 0.02829 e of the q sum)
 
 ========================================================================
 ISOBUTENE  (HF/cc-pVDZ, fixed geometry)
@@ -215,7 +215,7 @@ E(RHF)  G09 -156.1241243460   pipeline -156.1241243484   delta 2.37e-09 Ha
      2.16  BD (   1) C   1 - C   3 -> RY*(   1) C   2
      2.44  BD (   1) C   1 - C   3 -> RY*(   1) C   4
      1.00  BD (   1) C   1 - C   3 -> BD*(   1) C   1 - C   2
--- E(2), pipeline (top 12 of 48 rows >= 0.5) --
+-- E(2), pipeline (first 12 table rows, NB-acceptor block first; 48 pairs >= 0.5 kcal/mol) --
      5.65  C2-H7:BD -> C1-C3:NB
      5.51  C3-H8:BD -> C1-C4:NB
      4.03  C1-C2:BD -> C4-H11:NB
@@ -225,7 +225,7 @@ E(RHF)  G09 -156.1241243460   pipeline -156.1241243484   delta 2.37e-09 Ha
      3.76  C1-C4:BD -> C1-C3:NB
      3.76  C1-C4:BD -> C1-C2:NB
      2.74  C2-H6:BD -> C1-C4:NB
-     2.70  C1:LP -> C4:RY
      2.35  C1-C4:BD -> C4-H11:NB
      2.34  C1-C4:BD -> C4-H12:NB
-   totals : sum q = 0.20594 e | sum E2 = 197.8 kcal/mol over all 1280 pairs (166.5 from the 74 pairs >= 0.5 kcal/mol; a series sum incl. Rydberg couplings, not a molecular property) | 16 donors x 80 acceptors
+     2.06  C1-C2:BD -> C3-H10:NB
+   totals : sum q = 0.20594 e | sum E2 = 197.8 kcal/mol over all 1280 pairs (166.5 from the 74 pairs >= 0.5 kcal/mol; a series sum incl. Rydberg couplings, not a molecular property) | 16 donors x 80 acceptors | rows: 192 NB-acceptor / 1088 RY-acceptor | blocks: 1..192 NB, 193..1280 RY (RY rows: 61.4 kcal/mol of the E2 series, 0.04784 e of the q sum)

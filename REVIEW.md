@@ -32,8 +32,9 @@ of localized property-optimized orbitals (LPO) (Nikolaienko and
 Bulavin, *Int. J. Quantum Chem.* **119** (2019) e25798). The
 chemist’s LPO (CLPO) does the same job as NBO — bonding (BD),
 antibonding (NB), lone pair (LP), and Rydberg (RY) — with different
-machinery. Treat the bonding graph as comparable and the E(2) table
-as interpretive ([VALIDATION.md](VALIDATION.md)).
+machinery. Treat the bonding graph as comparable, the charge-transfer
+numbers as the primary comparison, and the E(2) magnitudes as
+interpretive ([VALIDATION.md](VALIDATION.md)).
 
 ## PNAO — `--pnao`
 
@@ -96,8 +97,9 @@ Lewis-like set labelled BD / NB / LP / RY (bonding, antibonding,
 lone pair, Rydberg). This is the NBO analogue in the stack.
 
 **What it is for.** The bonding graph, orbital pictures, and the full
-`--e2` treatment. CLPO labels and JANPA’s printed charge-transfer
-table live in `<base>.JANPA`. Occupied-block energies on ethene
+`--e2` treatment (charge transfer first, E(2) second). CLPO labels and
+JANPA’s printed charge-transfer table live in `<base>.JANPA`.
+Occupied-block energies on ethene
 (wB97X-D3/def2-TZVP): cores −10.13 Ha, C=C σ −0.89, four C–H −0.62,
 π −0.37.
 
@@ -153,7 +155,7 @@ PNAO only to inspect the construction intermediate; it is not a
 second charge set. Hybrids before Lewis pairing: `--lho`. A
 one-electron property partitioned into atom and pair terms, without
 Lewis constraints: `--lpo` (hybrids: `--aho`). Bonding graph,
-pictures, and E(2) / q pairs: `--clpo`. Every set flag writes the
+pictures, and q / E(2) pairs: `--clpo`. Every set flag writes the
 same pair — cartesian viewer, spherical substrate — and `--e2`
 takes the substrate. `--all-sets` writes all six.
 
@@ -164,11 +166,13 @@ split is Occup > 1.0. `--avogadro` writes integer `Occup = 2/0`.
 `Spin=` is retagged from one uniform label. Open-shell references
 are out of scope.
 
-E(2) = n_i F_ij² / (F_jj − F_ii) kcal/mol is well-defined at HF.
-Under DFT the operator is the auxiliary Kohn–Sham matrix; E(2) is
-indicative. Prefer q = D_ij² / D_ii there (the number JANPA prints
-in its charge-transfer table). JANPA itself has no E(2) feature;
-the table is this tool’s computation.
+q = D_ij² / D_ii is the primary number: a density statement — the
+charge transferred between the two orbitals — and the number JANPA
+prints in its own charge-transfer table; it keeps its meaning under
+DFT. E(2) = n_i F_ij² / (F_jj − F_ii) kcal/mol is the companion
+estimate: well-defined at HF; under DFT the operator is the auxiliary
+Kohn–Sham matrix, so E(2) is indicative. JANPA itself has no E(2)
+feature; the table is this tool’s computation.
 
 Pairs with |F_ij| / (F_jj − F_ii) ≥ 0.25 are marked `*`. The two
 orbitals are strongly mixed and the second-order estimate is not
