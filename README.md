@@ -279,6 +279,13 @@ of any JANPA export and writes `<stem>_E2.txt`:
   3c-2e bridged ethyl cation surfaces as one strongly mixed pair instead of
   a hyperconjugation energy).
 
+For CLPO exports the rows are grouped by acceptor class: two-centre (NB)
+acceptors first, then one-centre (RY) acceptors. Every pair is kept and
+the totals line carries the split; one-centre acceptors range from
+basis-extra diffuse orbitals (couplings that can outrank valence rows in
+E2 while carrying little charge) to populated vacant orbitals such as a
+carbocation's empty p.
+
 `--e2` gates everything the way `--sort-energy` does, plus an independent
 cross-check of the whole Fock matrix against JANPA's own NAO data (the
 `E2_pert` recipe: `<base>.fock_nao.txt` transformed with the set's chain —

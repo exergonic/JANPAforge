@@ -1372,6 +1372,20 @@ def pair_interaction_analysis(
                     ct_note = (f"{log_path.name}: no CT pairs above "
                                "JANPA's 0.01 e print threshold")
 
+    fallback = se.tag if se else "MO"
+
+    def name(idx: int) -> str:
+        return labels[idx + 1] if labels else f"{fallback} {idx + 1}"
+
+    # Acceptor class for bucketing.  Labels exist only when the log's
+    # occupancy fingerprint matched this export (CLPO); without them we
+    # know only the occupancy, and ordering stays purely by E2.
+    def acceptor_class(j: int) -> str:
+        if not labels:
+            return "?"
+        cls = labels[j + 1].rsplit(":", 1)[-1]
+        return "RY" if cls == "RY" else "NB"
+
     rows = []
     n_skip = 0
     for i in range(n):
@@ -1390,16 +1404,28 @@ def pair_interaction_analysis(
                 strong = abs(F_loc[i][j]) / de >= E2_STRONG_RATIO
             else:
                 n_skip += 1
-            rows.append((e2, q, i, j, F_loc[i][j], de, strong))
-    rows.sort(key=lambda r: (r[0] is None, -(r[0] or 0.0)))
-
-    fallback = se.tag if se else "MO"
-
-    def name(idx: int) -> str:
-        return labels[idx + 1] if labels else f"{fallback} {idx + 1}"
+            rows.append((e2, q, i, j, F_loc[i][j], de, strong,
+                         acceptor_class(j)))
+    # Valence-acceptor (NB) rows first, Rydberg last; E2 descending inside
+    # each block.  A Rydberg acceptor overlaps the donor's own space and
+    # couples to it through F_ij even at a 60+ eV gap, so its E2 can
+    # outrank the chemically meaningful rows -- and, being delocalized
+    # over the molecule, q stays near zero there.  Bucketing keeps every
+    # pair (nothing hidden) while leaving the Lewis-consistent rows where
+    # a chemist reads them first.
+    rows.sort(key=lambda r: (r[7] != "NB", r[0] is None, -(r[0] or 0.0)))
 
     table_rows = []
-    for k, (e2, q, i, j, fij, de, strong) in enumerate(rows, 1):
+    block = None
+    for k, (e2, q, i, j, fij, de, strong, acls) in enumerate(rows, 1):
+        if acls != block:
+            block = acls
+            if acls == "NB":
+                table_rows.append(
+                    "  --- two-centre acceptors (NB) " + "-" * 37)
+            elif acls == "RY":
+                table_rows.append(
+                    "  --- one-centre acceptors (RY) " + "-" * 37)
         e2s = f"{e2:11.2f}" if e2 is not None else "          -"
         table_rows.append(
             f"{k:>4}  {name(i):>18} -> {name(j):<18} "
@@ -1413,13 +1439,27 @@ def pair_interaction_analysis(
     n_strong = sum(1 for r in rows if r[6])
     n_don = sum(1 for o in occ_tgt if o > 1.0)
     n_acc = len(occ_tgt) - n_don
+    n_nb = sum(1 for r in rows if r[7] == "NB")
+    n_ry = sum(1 for r in rows if r[7] == "RY")
+    split = (f" | rows: {n_nb} NB-acceptor / {n_ry} RY-acceptor"
+             if labels and (n_nb or n_ry) else "")
+    ryd = ""
+    if labels and n_ry:
+        e2_ry = sum(r[0] for r in rows
+                    if r[7] == "RY" and r[0] is not None)
+        q_ry = sum(r[1] for r in rows if r[7] == "RY")
+        ryd = (f" | blocks: 1..{n_nb} NB, {n_nb + 1}..{len(rows)} RY "
+               f"(RY rows: {e2_ry:.1f} kcal/mol of the E2 series, "
+               f"{q_ry:.5f} e of the q sum)")
     totals = (f"totals : sum q = {sum_q:.5f} e | "
               f"sum E2 = {sum_e2:.1f} kcal/mol over all {len(rows)} pairs "
               f"({sum_big:.1f} from the {n_big} pairs >= 0.5 kcal/mol; a "
               f"series sum incl. Rydberg couplings, not a molecular "
               f"property) | {n_don} donors x {n_acc} acceptors"
+              + split
               + (f" | {n_strong} strongly mixed (*)" if n_strong else "")
-              + (f" | {n_skip} skipped: dE <= 0" if n_skip else ""))
+              + (f" | {n_skip} skipped: dE <= 0" if n_skip else "")
+              + ryd)
 
     header = [
         f"pair-interaction analysis  [{target.name}]",
@@ -1442,9 +1482,22 @@ def pair_interaction_analysis(
         "         estimate is not meaningful for them (often a sign the "
         "Lewis-like",
         "         reference itself is inadequate -- e.g. 3c-2e bonding).",
-        f"{'#':>4}  {'donor':>18} -> {'acceptor':<18} {'F_ij':>9} "
-        f"{'dE/Ha':>9} {'E2(kcal/mol)':>11} {'q(e)':>9}",
     ]
+    if labels:
+        header += [
+            "         rows are grouped by acceptor class: two-centre "
+            "acceptors (NB) first,",
+            "         then one-centre acceptors (RY) -- the one-centre set "
+            "ranges from",
+            "         basis-extra diffuse orbitals (couplings with little "
+            "q) to",
+            "         chemically active vacant orbitals, e.g. a carbocation "
+            "empty p;",
+            "         all pairs are kept.",
+        ]
+    header.append(
+        f"{'#':>4}  {'donor':>18} -> {'acceptor':<18} {'F_ij':>9} "
+        f"{'dE/Ha':>9} {'E2(kcal/mol)':>11} {'q(e)':>9}")
     return header, table_rows, totals
 
 
