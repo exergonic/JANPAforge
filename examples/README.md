@@ -63,6 +63,10 @@ NBO 3.1 gives 0.85 (different acceptors; the full story is in
 not as an NBO-grade number. The HF row (water) is the one with a direct
 cross-program check.
 
+All "NBO 3.1" values quoted here and in `../VALIDATION.md` come from the NBO
+module bundled with Gaussian — not authentic NBO; see the caveat at the top
+of `../VALIDATION.md` (Weinhold, *J. Comput. Chem.* **47** (2026) e70374).
+
 Two sanity signals worth knowing: each `_E2.txt` run re-checks JANPA's
 printed CT pairs live (formaldehyde 3/3, isobutene 6/6, tbutyl 9/9 in the
 copies here), and the `sum q` column reproduces the per-molecule CT totals

@@ -14,7 +14,7 @@ real energies, clean labels, the right electron count.
 ![output: Molden](https://img.shields.io/badge/output-Molden-e36209?style=flat-square)
 [![tested with ORCA 6.1.1](https://img.shields.io/badge/tested_with-ORCA_6.1.1-0b5f8a?style=flat-square)](https://www.faccts.de/orca/)
 [![tested with JANPA 2.02](https://img.shields.io/badge/tested_with-JANPA_2.02-6f42c1?style=flat-square)](http://janpa.sourceforge.net/)
-[![NPA + Wiberg validated vs NBO 3.1](https://img.shields.io/badge/NPA_%2B_Wiberg_validated_vs-NBO_3.1-brightgreen?style=flat-square)](VALIDATION.md)
+[![NPA + Wiberg cross-checked vs G09 NBO 3.1](https://img.shields.io/badge/NPA_%2B_Wiberg_cross-checked_vs-G09_NBO_3.1-blue?style=flat-square)](VALIDATION.md)
 [![no .47 file needed](https://img.shields.io/badge/.47_file-not_needed-blueviolet?style=flat-square)](#quick-start)
 [![license: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](LICENSE)
 
@@ -37,8 +37,9 @@ writes, for each JANPA orbital set, **exactly two Molden files**: one
 *viewer* file that opens correctly anywhere, and the *spherical substrate*
 kept for further analysis. It also computes the
 **NBO-style E(2) and charge-transfer table** for any set, and its NPA and
-Wiberg numbers are **validated against Gaussian 09's NBO 3.1** — the E(2)
-comparison is interpretive ([details](VALIDATION.md)).
+Wiberg numbers are **cross-checked against the NBO 3.1 module of
+Gaussian 09** — a comparison that carries a [standing caveat](VALIDATION.md);
+the E(2) comparison is interpretive.
 
 ```text
 ORCA (.gbw)
@@ -142,6 +143,16 @@ indices within 0.004, orbital occupancies within 6e-4, and isobutene's
 hyperconjugation channels within 3 % — with one honest divergence
 documented. The full record, plus `validation/compare.py` and the raw
 evidence, is in [VALIDATION.md](VALIDATION.md).
+
+> **Caveat on "NBO 3.1" (2026).** The NBO 3.1 module shipped with Gaussian
+> is not authentic NBO, and its deviations from authentic NBO grow with
+> atomic weight — from about 1 % for the light-atom C/H/O values quoted
+> here to order-of-magnitude failures in heavy-element cases
+> (F. Weinhold, *J. Comput. Chem.* **47** (2026) e70374,
+> doi:10.1002/jcc.70374). The numbers above sit in the least-affected
+> regime and are a consistency cross-check, not an NBO-grade validation;
+> do not cite them as "NBO" results. Full text in
+> [VALIDATION.md](VALIDATION.md).
 
 ## Viewing orbitals (both fixes are on by default)
 

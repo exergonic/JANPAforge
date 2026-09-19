@@ -24,8 +24,10 @@ natural atomic orbital (NAO) construction, populations, Wiberg
 indices — the same well-defined algorithm as Natural Bond Orbitals
 (NBO) (Nikolaienko, Bulavin, and Hovorun, *Comput. Theor. Chem.*
 **1050** (2014) 15–22). On HF/cc-pVDZ water, formaldehyde, and
-isobutene, NPA charges agree with Gaussian 09 NBO 3.1 within 0.004 e
-and Wiberg indices within 0.004. Localization is JANPA’s own family
+isobutene, NPA charges agree with the NBO 3.1 module of Gaussian 09
+within 0.004 e and Wiberg indices within 0.004 (that module is not
+authentic NBO — see the [caveat](VALIDATION.md)). Localization is
+JANPA’s own family
 of localized property-optimized orbitals (LPO) (Nikolaienko and
 Bulavin, *Int. J. Quantum Chem.* **119** (2019) e25798). The
 chemist’s LPO (CLPO) does the same job as NBO — bonding (BD),
@@ -103,7 +105,8 @@ table live in `<base>.JANPA`. Occupied-block energies on ethene
 cross-program claims are the same donors and the same ranking.
 Magnitudes can differ when the two schemes build different acceptors.
 At HF/cc-pVDZ, formaldehyde LP(O)→σ\*(C–H) is 26.49 kcal/mol in the
-CLPO basis and 0.85 kcal/mol in NBO 3.1, because F_ij is 0.159 Ha
+CLPO basis and 0.85 kcal/mol in Gaussian's NBO 3.1 module, because
+F_ij is 0.159 Ha
 against 0.034 Ha (E2 ∝ F²). Isobutene’s four hyperconjugation
 channels stay within 3% on the same geometry. Documented as a
 property of the constructions, not as a numerical error
@@ -175,5 +178,6 @@ not as a hyperconjugation energy.
 PNAO has no pair analysis.
 
 The NBO 3.1 record in [VALIDATION.md](VALIDATION.md) is HF/cc-pVDZ
-only. It does not validate DFT, the Molden viewer layer, or a
-modern NBO-grade reference.
+only, and its NBO side comes from Gaussian's non-authentic NBO 3.1
+module ([caveat](VALIDATION.md)). It does not validate DFT, the Molden
+viewer layer, or a modern NBO-grade reference.

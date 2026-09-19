@@ -1,8 +1,28 @@
 # Cross-program validation: JANPA/CLPO analysis vs NBO 3.1
 
+> **Read first — the "NBO 3.1" caveat (2026).**
+> The values labelled "NBO 3.1" throughout this record come from the NBO
+> module bundled with Gaussian (here G09W Rev. B.01), **not** from the
+> authentic NBO program. That module is a modified, relabeled descendant
+> of the original NBO code, and its numbers deviate from authentic NBO
+> increasingly with atomic weight: the 2026 software note by the NBO
+> author documents ≈1 % differences for near-equilibrium C/H/O values in
+> light molecules, >10 % for heavier atoms, and order-of-magnitude
+> failures in the heavy-element examples given there (F. Weinhold,
+> *J. Comput. Chem.* **47** (2026) e70374, doi:10.1002/jcc.70374). The
+> comparisons below are HF/cc-pVDZ single points on three C/H/O
+> molecules — the light-atom, small-basis regime in which NBO 3.1 was
+> reported to *approximately* reproduce authentic NBO — so they remain a
+> useful consistency cross-check of the ORCA → Molden → JANPA chain.
+> They are **not** an NBO-grade validation: do not cite these values as
+> "NBO" results, and cite the software by name and version wherever they
+> are quoted. Where a comparison against authentic NBO is required, use
+> NBO7.
+
 Purpose: establish that the orbital-interaction numbers this toolchain
 produces (ORCA → JANPA → CLPO analysis) are comparable to an independent,
-canonical implementation of the same physics (Gaussian's NBO 3.1). This
+widely used implementation of the same physics — the NBO module bundled
+with Gaussian, labelled "NBO 3.1". This
 document is a validation record: the questions it answers are whether the
 numbers are right in kind, and by how much the two implementations differ.
 It is not a regression test suite.
@@ -141,7 +161,8 @@ Geometry: fixed single-point coordinates, identical in both input files
 | in-plane LP(O) → σ\*(C–H) (×2) | 0.85 | **26.49** | see below |
 
 **Documented divergence.** The LP(O)→σ\*(C–H) interaction is 0.85 kcal/mol
-in the NBO basis and 26.5 kcal/mol in the CLPO basis. The cause is in the
+in the NBO basis (Gaussian's NBO 3.1 module — see the caveat at the top)
+and 26.5 kcal/mol in the CLPO basis. The cause is in the
 coupling, not the energies: F_ij = 0.034 Ha (NBO) vs 0.159 Ha (CLPO)
 — 4.7× — with similar ΔE (1.64 vs 1.15 Ha), and E2 ∝ F². The two sets'
 "σ\*(C–H)" acceptors are *different functions*: NBO's BD\* is a
@@ -149,7 +170,10 @@ tightly-localized antibond, while the CLPO NB is more diffuse and overlaps
 the oxygen lone pair far more strongly. This is a property of the two
 localization schemes, not a numerical error — every other interaction
 above, and the donor identification, agree. This is documented explicitly so the
-divergence is not mistaken for a defect.
+divergence is not mistaken for a defect. Note also that the NBO-side
+numbers in this section come from the non-authentic NBO 3.1 module
+(caveat at the top), so the divergence is measured against that
+implementation.
 
 Internal consistency checks: orthonormality 8.3e-09, canonical
 residual 1.0e-08, E cross-check 2.4e-08.
@@ -213,7 +237,10 @@ Internal consistency checks: orthonormality 6.3e-08, canonical residual
   (formaldehyde LP→σ\*(C–H)); that is a property of the constructions, not
   an error signal. The robust claims are: same donors, same interaction
   ranking, and — when ΔE and F_ij agree — numerically matching energies.
-- NBO 3.1 is a baseline, not a modern NBO-grade reference; and the JANPA
+- NBO 3.1 is a baseline, not a modern NBO-grade reference: it is a
+  non-authentic descendant of NBO whose deviations grow with atomic
+  weight (see the caveat at the top). It remains usable as a cross-check
+  only in the light-atom, small-basis regime compared here; and the JANPA
   side has no E(2) of its own — the E2 table is this tool's computation
   on CLPOs.
 - Pinned versions: ORCA 6.1.1 / G09W B.01 / JANPA 2.02.

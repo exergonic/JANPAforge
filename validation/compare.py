@@ -1,5 +1,9 @@
 """Compare G09/NBO 3.1 against this pipeline's JANPA/CLPO analysis.
 
+NOTE: "NBO 3.1" is the module bundled with Gaussian -- not authentic NBO;
+see the caveat at the top of ../VALIDATION.md (Weinhold, J. Comput. Chem.
+47 (2026) e70374).
+
 Recomputes the tables in ../VALIDATION.md from the inputs and outputs in
 the per-molecule folders next to this script:
 
