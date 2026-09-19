@@ -141,8 +141,9 @@ Cross-checked against Gaussian 09's NBO 3.1 on HF/cc-pVDZ for water,
 formaldehyde, and isobutene: populations agree within 0.004 e, Wiberg bond
 indices within 0.004, orbital occupancies within 6e-4, and isobutene's
 hyperconjugation channels within 3 % — with one honest divergence
-documented. The full record, plus `validation/compare.py` and the raw
-evidence, is in [VALIDATION.md](VALIDATION.md).
+documented. The full record is in [VALIDATION.md](VALIDATION.md); the raw
+evidence and the rerun instructions live in
+[`validation/`](validation/README.md).
 
 > **Caveat on "NBO 3.1" (2026).** The NBO 3.1 module shipped with Gaussian
 > is not authentic NBO, and its deviations from authentic NBO grow with
