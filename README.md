@@ -14,7 +14,7 @@ real energies, clean labels, the right electron count.
 ![output: Molden](https://img.shields.io/badge/output-Molden-e36209?style=flat-square)
 [![tested with ORCA 6.1.1](https://img.shields.io/badge/tested_with-ORCA_6.1.1-0b5f8a?style=flat-square)](https://www.faccts.de/orca/)
 [![tested with JANPA 2.02](https://img.shields.io/badge/tested_with-JANPA_2.02-6f42c1?style=flat-square)](http://janpa.sourceforge.net/)
-[![NPA + Wiberg cross-checked vs G09 NBO 3.1](https://img.shields.io/badge/NPA_%2B_Wiberg_cross-checked_vs-G09_NBO_3.1-blue?style=flat-square)](VALIDATION.md)
+[![NPA + Wiberg cross-checked vs G09 NBO 3.1](https://img.shields.io/badge/NPA_%2B_Wiberg_cross--checked_vs-G09_NBO_3.1-blue?style=flat-square)](VALIDATION.md)
 [![no .47 file needed](https://img.shields.io/badge/.47_file-not_needed-blueviolet?style=flat-square)](#quick-start)
 [![license: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](LICENSE)
 
